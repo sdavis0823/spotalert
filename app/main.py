@@ -445,28 +445,41 @@ def flightaware_scan(airport: str | None = None):
 
 
 @app.get("/api/flightaware/debug/{icao}")
-def flightaware_debug(icao: str):
-    """Diagnostic: show what FlightAware actually returns for an airport and
-    why flights were/weren't flagged notable. Uses one query."""
+def flightaware_debug(icao: str, hours: int = 48, pages: int = 6):
+    """Diagnostic: scan a wide look-ahead window of scheduled arrivals and report
+    the time span covered, data completeness, and any notable/livery matches.
+    Uses up to `pages` queries."""
     src = fa_mod.FlightAwareSource()
     if not src.available():
         return {"ok": False, "note": "no key"}
     if not src.budget_ok():
         return {"ok": False, "note": "budget reached"}
-    flights = src.airport_flights(icao.upper())
-    sched = flights.get("scheduled_arrivals", [])
-    sample = []
-    for fl in sched[:50]:
+    now = int(time.time())
+    start = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+    end = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now + hours * 3600))
+    sched = src.scheduled_arrivals(icao.upper(), max_pages=pages, start=start, end=end)
+    times = [f.get("scheduled_on") for f in sched if f.get("scheduled_on")]
+    notable = []
+    for fl in sched:
         ac = fa_mod._notable_for_flight(fl)
-        sample.append({"ident": fl.get("ident"), "reg": fl.get("registration"),
-                       "type": fl.get("type"), "origin": fl.get("origin"),
-                       "notable": bool(ac), "cat": ac.get("category") if ac else None})
+        if ac:
+            notable.append({"ident": fl.get("ident"), "reg": fl.get("registration"),
+                            "type": fl.get("type"), "origin": fl.get("origin"),
+                            "cat": ac.get("category")})
+
+    def _fmt(ts):
+        return time.strftime("%Y-%m-%d %H:%MZ", time.gmtime(ts)) if ts else None
     return {"ok": True,
-            "counts": {k: len(v) for k, v in flights.items()},
-            "scheduled_with_reg": sum(1 for f in sched if f.get("registration")),
-            "scheduled_with_type": sum(1 for f in sched if f.get("type")),
-            "notable_found": sum(1 for s in sample if s["notable"]),
-            "sample": sample,
+            "total_scheduled_seen": len(sched),
+            "window_requested_hours": hours,
+            "earliest": _fmt(min(times)) if times else None,
+            "latest": _fmt(max(times)) if times else None,
+            "hours_actually_covered": round((max(times) - now) / 3600, 1) if times else 0,
+            "with_reg": sum(1 for f in sched if f.get("registration")),
+            "notable_found": len(notable),
+            "notable": notable[:40],
+            "sample_types": list({f.get("type") for f in sched if f.get("type")})[:40],
+            "budget_remaining": fa_mod.budget_remaining(),
             "last_error": fa_mod.last_error()}
 
 

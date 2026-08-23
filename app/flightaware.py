@@ -85,14 +85,19 @@ class FlightAwareSource:
     def budget_ok(self) -> bool:
         return budget_remaining() > 0
 
-    def scheduled_arrivals(self, airport_icao: str, max_pages: int = 1) -> list[dict]:
+    def scheduled_arrivals(self, airport_icao: str, max_pages: int = 1,
+                           start: str | None = None, end: str | None = None) -> list[dict]:
         """Return upcoming scheduled arrivals for an airport (not yet departed).
 
-        Each item: {ident, registration, type, origin, scheduled_on (epoch),
-        estimated_on (epoch|None)}. Empty list if no key or on error.
+        start/end are ISO-8601 UTC strings to widen the look-ahead window.
+        Each page (~15 flights) counts as one AeroAPI query.
         """
-        data = self._get(f"/airports/{airport_icao}/flights/scheduled_arrivals",
-                         {"max_pages": max_pages})
+        params = {"max_pages": max_pages}
+        if start:
+            params["start"] = start
+        if end:
+            params["end"] = end
+        data = self._get(f"/airports/{airport_icao}/flights/scheduled_arrivals", params)
         if not data:
             return []
         return [_parse_flight(f) for f in data.get("scheduled_arrivals", [])]
