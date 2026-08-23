@@ -1,30 +1,84 @@
-"""Curated special-livery registry — the growable part of the moat.
+"""Curated special-livery registry — airline retro / heritage / special paint.
 
 A feed can't tell you a tail wears a special scheme; a maintained list can.
-Entries are keyed by REGISTRATION (not hex) so they attach to the correct real
-airframe after you load the OpenSky identity DB (which maps real hex -> reg).
-Applying tags them base_interest=1 so they always push, regardless of rarity.
+Entries are keyed by REGISTRATION. Applying tags them base_interest=1 so they
+always push, regardless of rarity. Matched by registration in scheduled
+arrivals and (via the aircraft DB) in live traffic.
 
-This is a STARTER set focused on frames that frequent KPHX (an American hub and
-a Southwest city) plus a few famous ones. TREAT AS ILLUSTRATIVE — verify against
-current fleets and expand from community special-livery trackers, or grow it
-live via POST /api/aircraft/tag as you spot them.
+This set is compiled from published enthusiast livery lists (airportspotting.com,
+simpleflying.com) plus Phoenix/Southwest-relevant state & heritage jets — all
+REAL registrations, no invented tails. Airline special liveries change over time
+(repaints, retirements), so treat as a living list and grow it with
+POST /api/aircraft/tag as you spot new ones.
 
 Format: (registration, category, [tags])
 """
 CURATED_LIVERIES = [
-    # Phoenix-relevant heritage / state liveries
-    ("N837AW", "special", ["heritage", "america-west", "arizona"]),   # American A319 America West
-    ("N955WN", "special", ["state-livery", "arizona-one"]),           # Southwest 737-700 Arizona One
-    ("N915NN", "special", ["heritage", "twa"]),                       # American 737-800 TWA
-    ("N744P",  "special", ["heritage", "piedmont"]),                  # American Piedmont heritage
-    ("N742PS", "special", ["heritage", "psa"]),                       # American PSA heritage
-    # Famous liveries that visit major hubs
-    ("N559AS", "special", ["special-livery", "more-to-love"]),        # Alaska
-    ("N570AS", "special", ["special-livery", "salmon-thirty-salmon"]),# Alaska salmon jet
-    ("N487WN", "special", ["state-livery", "maryland-one"]),          # Southwest
-    ("N8620H", "special", ["state-livery", "tennessee-one"]),         # Southwest
-    ("N214WN", "special", ["state-livery", "colorado-one"]),          # Southwest
+    # ---- North America ----
+    ("N768AX", "special", ["retro", "airborne-express"]),        # ABX Air 767
+    ("N421QX", "special", ["retro", "horizon"]),                 # Alaska/Horizon Q400
+    # American Airlines heritage fleet
+    ("N742PS", "special", ["heritage", "psa"]),
+    ("N744P", "special", ["heritage", "piedmont"]),
+    ("N745VJ", "special", ["heritage", "allegheny"]),
+    ("N838AW", "special", ["heritage", "america-west"]),
+    ("N837AW", "special", ["heritage", "america-west"]),
+    ("N578UW", "special", ["heritage", "us-airways"]),
+    ("N905NN", "special", ["heritage", "astrojet"]),
+    ("N915NN", "special", ["heritage", "twa"]),
+    ("N916NN", "special", ["heritage", "reno-air"]),
+    ("N917NN", "special", ["heritage", "aircal"]),
+    ("N760MQ", "special", ["heritage", "tricolor"]),
+    # Southwest state & special liveries
+    ("N955WN", "special", ["state-livery", "arizona-one"]),
+    ("N487WN", "special", ["state-livery", "maryland-one"]),
+    ("N8620H", "special", ["state-livery", "tennessee-one"]),
+    ("N214WN", "special", ["state-livery", "colorado-one"]),
+    ("N711HK", "special", ["retro", "spirit-of-kitty-hawk"]),
+    # Alaska specials
+    ("N559AS", "special", ["special-livery", "more-to-love"]),
+    ("N570AS", "special", ["special-livery", "salmon-thirty-salmon"]),
+    # Air Canada / United
+    ("C-FZUH", "special", ["retro", "transcanada"]),
+    ("N475UA", "special", ["retro", "united"]),
+    ("N75435", "special", ["heritage", "continental"]),
+    # ---- Europe ----
+    ("EI-DVM", "special", ["retro", "aer-lingus"]),
+    ("VP-BNT", "special", ["retro", "aeroflot"]),
+    ("9H-AEI", "special", ["retro", "air-malta"]),
+    ("OE-LBO", "special", ["retro", "austrian"]),
+    ("G-EUPJ", "special", ["retro", "bea-red-square"]),
+    ("G-BNLY", "special", ["retro", "landor"]),            # BA 747
+    ("G-BYGC", "special", ["retro", "boac"]),              # BA 747
+    ("G-CIVB", "special", ["retro", "negus"]),             # BA 747
+    ("D-AICH", "special", ["retro", "condor"]),
+    ("D-ABUM", "special", ["retro", "condor"]),
+    ("OY-RUT", "special", ["retro", "danish-air-transport"]),
+    ("D-AIDV", "special", ["retro", "lufthansa"]),
+    ("D-ABYT", "special", ["retro", "lufthansa"]),
+    ("SP-LIM", "special", ["retro", "lot"]),
+    ("OY-KBO", "special", ["retro", "sas"]),
+    ("CS-TJR", "special", ["retro", "tap"]),
+    ("YR-BGG", "special", ["retro", "tarom"]),
+    ("TC-JNC", "special", ["retro", "turkish"]),
+    # ---- Rest of world ----
+    ("LV-GOO", "special", ["retro", "aerolineas-argentinas"]),
+    ("N284AV", "special", ["retro", "avianca"]),
+    ("4X-EDF", "special", ["retro", "el-al"]),
+    ("PK-GHD", "special", ["retro", "garuda"]),
+    ("PK-GFM", "special", ["retro", "garuda-1950s"]),
+    ("PK-GFN", "special", ["retro", "garuda"]),
+    ("PK-GIK", "special", ["retro", "garuda"]),
+    ("A9C-FG", "special", ["retro", "gulf-air"]),
+    ("9M-MXA", "special", ["special-livery", "malaysia-40th"]),
+    ("OD-MRT", "special", ["retro", "mea"]),
+    ("AP-BLA", "special", ["retro", "pia"]),
+    ("AP-BLT", "special", ["retro", "pia"]),
+    ("AP-BMG", "special", ["retro", "pia"]),
+    ("VH-VXQ", "special", ["retro", "retro-roo-ii"]),      # Qantas
+    ("VH-XZP", "special", ["retro", "retro-roo"]),         # Qantas
+    ("TS-IOP", "special", ["retro", "tunisair"]),
+    ("VT-ATV", "special", ["retro", "vistara"]),
 ]
 
 
@@ -38,9 +92,8 @@ def lookup(reg: str):
 
 
 def apply(conn) -> int:
-    """Tag every curated livery whose registration already exists in the
-    aircraft table (i.e. after the identity DB is loaded). Returns how many
-    matched. Never clobbers a hex; matches purely by registration."""
+    """Tag every curated livery whose registration exists in the aircraft table.
+    Returns how many matched. Matches purely by registration."""
     n = 0
     for reg, category, tags in CURATED_LIVERIES:
         cur = conn.execute(
