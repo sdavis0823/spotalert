@@ -19,6 +19,10 @@ from pydantic import BaseModel, EmailStr
 
 from . import db, config, aircraft as ac_mod, engine
 from . import sources, notify, scheduler, eta as eta_mod, watchlist, logbook, photos, push, liveries
+from . import flightaware as fa_mod
+from . import airports_catalog as catalog
+from . import live_extras
+from . import type_art
 
 app = FastAPI(title="SpotAlert — unusual-aircraft alerts")
 
@@ -70,6 +74,7 @@ def _enrich_event_row(conn, row):
         "interest_tags": ac.get("interest_tags"),
         "is_blocked": ac.get("is_blocked"),
         "display": ac_mod.display_name(ac),
+        "type_art": type_art.resolve(ac.get("typecode"), ac.get("model")),
     }
 
 
@@ -79,6 +84,64 @@ def list_airports():
     with db.get_conn() as conn:
         rows = conn.execute("SELECT * FROM airports ORDER BY icao").fetchall()
     return [dict(r) for r in rows]
+
+
+# ---- world airport catalog (search / browse / select) --------------------
+@app.get("/api/airports/search")
+def airports_search(q: str = Query(..., min_length=1), limit: int = Query(40, ge=1, le=100)):
+    """Live search across the ~20k-airport catalog by name/city/state/code."""
+    tracked = _tracked_set()
+    out = catalog.search(q, limit)
+    for a in out:
+        a["tracked"] = a["icao"].upper() in tracked
+    return {"count": len(out), "results": out}
+
+
+@app.get("/api/airports/countries")
+def airports_countries():
+    return catalog.countries()
+
+
+@app.get("/api/airports/states")
+def airports_states(country: str = Query(...)):
+    return catalog.states(country)
+
+
+@app.get("/api/airports/browse")
+def airports_browse(country: str = Query(...), state: str | None = None):
+    tracked = _tracked_set()
+    rows = catalog.airports_in(country, state)
+    for a in rows:
+        a["tracked"] = a["icao"].upper() in tracked
+    return {"count": len(rows), "results": rows}
+
+
+class SelectAirport(BaseModel):
+    icao: str
+
+
+@app.post("/api/airports/select")
+def airports_select(body: SelectAirport):
+    """Add a catalog airport to the tracked set so it gets scanned. Idempotent."""
+    a = catalog.get(body.icao)
+    if not a:
+        raise HTTPException(404, f"Unknown airport: {body.icao}")
+    with db.get_conn() as conn:
+        conn.execute(
+            """INSERT INTO airports (icao, iata, name, city, lat, lon)
+               VALUES (?,?,?,?,?,?)
+               ON CONFLICT(icao) DO UPDATE SET
+                 iata=excluded.iata, name=excluded.name, city=excluded.city,
+                 lat=excluded.lat, lon=excluded.lon""",
+            (a["icao"].upper(), a.get("iata"), a["name"], a.get("city"),
+             a.get("lat"), a.get("lon")))
+        conn.commit()
+    return {"ok": True, "airport": a}
+
+
+def _tracked_set() -> set[str]:
+    with db.get_conn() as conn:
+        return {r["icao"].upper() for r in conn.execute("SELECT icao FROM airports").fetchall()}
 
 
 @app.get("/api/board/{icao}")
@@ -278,6 +341,196 @@ def notify_run():
 @app.get("/api/scheduler")
 def scheduler_status():
     return scheduler.STATE
+
+
+# ---------------------------------------------------------------- live radar
+@app.get("/api/live/{icao}")
+def live_positions(icao: str, radius: int = Query(40, ge=5, le=120)):
+    """Aircraft currently near an airport, for the radar scope. Each contact has
+    bearing + distance from the field and a notable flag."""
+    icao = icao.upper()
+    with db.get_conn() as conn:
+        ap = conn.execute("SELECT * FROM airports WHERE icao=?", (icao,)).fetchone()
+        if not ap:
+            raise HTTPException(404, "airport not covered")
+        ap = dict(ap)
+    alive = sources.AirplanesLiveSource()
+    out = []
+    for a in alive.fetch_snapshot(ap["lat"], ap["lon"], radius_nm=radius):
+        if a.get("lat") is None or a.get("lon") is None:
+            continue
+        dist = sources.haversine_nm(ap["lat"], ap["lon"], a["lat"], a["lon"])
+        if dist > radius:
+            continue
+        brg = eta_mod._bearing(ap["lat"], ap["lon"], a["lat"], a["lon"])
+        ac = ac_mod.classify(ac_mod.get_aircraft(a["icao24"]))
+        notable = bool(ac.get("base_interest") or a.get("military")
+                       or ac.get("category") in ("military", "gov", "warbird", "tanker", "testbed", "special"))
+        out.append({
+            "icao24": a["icao24"], "callsign": a.get("callsign"),
+            "registration": ac.get("registration"), "type": ac.get("typecode"),
+            "display": ac_mod.display_name(ac) if ac.get("registration") else (a.get("callsign") or a["icao24"]),
+            "bearing": round(brg, 1), "dist_nm": round(dist, 1),
+            "alt": a.get("alt"), "gs": a.get("gs"), "track": a.get("track"),
+            "notable": notable, "category": ac.get("category"),
+            "is_blocked": ac.get("is_blocked"),
+        })
+    out.sort(key=lambda c: c["dist_nm"])
+    return {"airport": icao, "radius": radius, "count": len(out), "contacts": out}
+
+
+# ---------------------------------------------------------------- pre-takeoff
+@app.get("/api/upcoming/{icao}")
+def upcoming(icao: str):
+    """Notable aircraft SCHEDULED into an airport (pre-takeoff). Reads stored
+    scheduled alerts, plus a live FlightAware peek when a key is configured."""
+    icao = icao.upper()
+    now = int(time.time())
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM alerts WHERE airport_icao=? AND direction='scheduled'
+               AND event_time > ? ORDER BY event_time ASC LIMIT 50""",
+            (icao, now - 3600)).fetchall()
+    out = []
+    for r in rows:
+        ac = ac_mod.classify(ac_mod.get_aircraft(r["icao24"]))
+        d = dict(r)
+        d["display"] = ac_mod.display_name(ac)
+        d["category"] = ac.get("category")
+        d["interest_tags"] = ac.get("interest_tags")
+        d["lead_minutes"] = max(0, (r["event_time"] - now) // 60)
+        out.append(d)
+    return {"airport": icao, "count": len(out), "upcoming": out,
+            "flightaware": fa_mod.FlightAwareSource().available()}
+
+
+@app.post("/api/flightaware/scan")
+def flightaware_scan(airport: str | None = None):
+    """Manual 'Scan now' — combined FlightAware scan (pre-takeoff, departures,
+    enroute ETAs, diversions, cancellations). One AeroAPI query per airport.
+    Pass ?airport=ICAO to scan just one and spend a single query."""
+    src = fa_mod.FlightAwareSource()
+    if not src.available():
+        return {"ok": False, "note": "FlightAware key not set — add FLIGHTAWARE_API_KEY to enable pre-takeoff alerts."}
+    if not src.budget_ok():
+        return {"ok": False, "note": "Monthly free-tier query budget reached — scans resume next month (no charge).",
+                "budget_remaining": 0}
+    if airport:
+        airports = [airport.upper()]
+    else:
+        with db.get_conn() as conn:
+            airports = [r["icao"] for r in conn.execute("SELECT icao FROM airports").fetchall()]
+    total = 0
+    scanned = 0
+    for ap in airports:
+        if not src.budget_ok():
+            break
+        total += fa_mod.scan_airport_flights(ap)["new_alerts"]
+        scanned += 1
+    notify.dispatch_new()
+    return {"ok": True, "new_alerts": total, "airports_scanned": scanned,
+            "budget_remaining": fa_mod.budget_remaining()}
+
+
+@app.get("/api/flightaware/usage")
+def flightaware_usage():
+    """FlightAware free-tier budget status for the current month."""
+    src = fa_mod.FlightAwareSource()
+    return {"enabled": src.available(),
+            "used": fa_mod.usage_this_month(),
+            "budget": config.FA_MONTHLY_QUERY_BUDGET,
+            "remaining": fa_mod.budget_remaining()}
+
+
+class SearchQuery(BaseModel):
+    type: str | None = None          # ICAO type code, e.g. A388
+    registration: str | None = None  # tail or prefix
+    operator: str | None = None      # ICAO operator, e.g. AAL
+
+
+@app.post("/api/flightaware/search")
+def flightaware_search(q: SearchQuery):
+    """Global rare-jet search across the live worldwide fleet. Query-hungry, so
+    it's manual-only and still respects the monthly budget cap."""
+    src = fa_mod.FlightAwareSource()
+    if not src.available():
+        return {"ok": False, "note": "FlightAware key not set."}
+    if not src.budget_ok():
+        return {"ok": False, "note": "Monthly free-tier budget reached — try next month (no charge).", "results": []}
+    parts = []
+    if q.type:
+        parts.append(f"-type {q.type.upper()}")
+    if q.registration:
+        parts.append(f"-idents {q.registration.upper()}")
+    if q.operator:
+        parts.append(f"-airline {q.operator.upper()}")
+    if not parts:
+        raise HTTPException(400, "Provide a type, registration, or operator to search.")
+    results = fa_mod.FlightAwareSource().flight_search(" ".join(parts))
+    return {"ok": True, "query": " ".join(parts), "count": len(results),
+            "results": results, "budget_remaining": fa_mod.budget_remaining()}
+
+
+class FollowIn(BaseModel):
+    ident: str  # tail number or flight ident to follow anywhere
+
+
+@app.post("/api/follow")
+def follow_add(body: FollowIn):
+    fa_mod.add_follow(body.ident)
+    return {"ok": True, "follows": fa_mod.list_follows()}
+
+
+@app.get("/api/follows")
+def follow_list():
+    return {"follows": fa_mod.list_follows()}
+
+
+@app.post("/api/follow/remove")
+def follow_remove(body: FollowIn):
+    fa_mod.remove_follow(body.ident)
+    return {"ok": True, "follows": fa_mod.list_follows()}
+
+
+@app.post("/api/follow/check")
+def follow_check():
+    """Manual 'where are my followed aircraft now' — one query per followed tail."""
+    src = fa_mod.FlightAwareSource()
+    if not src.available():
+        return {"ok": False, "note": "FlightAware key not set."}
+    return {"ok": True, **fa_mod.check_follows(), "budget_remaining": fa_mod.budget_remaining()}
+
+
+# ------------------------------------------- free live extras (no key/budget)
+@app.get("/api/emergencies/{icao}")
+def emergencies(icao: str, radius: int = Query(120, ge=10, le=250)):
+    """Aircraft squawking 7500/7600/7700 near a tracked airport."""
+    with db.get_conn() as conn:
+        ap = _airport_row(conn, icao)
+    if not ap:
+        raise HTTPException(404, "unknown airport")
+    return {"airport": icao.upper(),
+            "emergencies": live_extras.emergencies_near(ap["lat"], ap["lon"], radius)}
+
+
+@app.get("/api/overhead")
+def overhead(lat: float = Query(...), lon: float = Query(...),
+             radius: int = Query(20, ge=2, le=100)):
+    """What's flying above a GPS point right now (notable ones flagged)."""
+    return {"lat": lat, "lon": lon, "radius_nm": radius,
+            "aircraft": live_extras.overhead_now(lat, lon, radius)}
+
+
+@app.get("/api/weather/{icao}")
+def weather(icao: str):
+    """Current weather + likely active runway for an airport (free METAR)."""
+    return live_extras.airport_weather(icao)
+
+
+@app.get("/api/typeguide")
+def typeguide():
+    """The visual type guide — all aircraft illustrations grouped by category."""
+    return {"types": type_art.manifest()}
 
 
 # ---------------------------------------------------------------- web push

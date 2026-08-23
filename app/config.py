@@ -58,3 +58,35 @@ SCHEDULER_LOOKBACK_HOURS = int(os.environ.get("SCHEDULER_LOOKBACK_HOURS", "6"))
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:alerts@spotalert.local")
+
+# --- FlightAware AeroAPI (optional) — enables pre-takeoff / scheduled alerts ---
+# Free Personal tier gives ~$5/month of queries. Get a key at
+# https://www.flightaware.com/commercial/aeroapi/  (My AeroAPI -> API key).
+FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY", "")
+FLIGHTAWARE_BASE = os.environ.get("FLIGHTAWARE_BASE", "https://aeroapi.flightaware.com/aeroapi")
+# How far ahead to watch scheduled arrivals (hours). Airlines load schedules a
+# day+ out; filed GA/military plans usually same-day.
+SCHEDULED_LOOKAHEAD_HOURS = int(os.environ.get("SCHEDULED_LOOKAHEAD_HOURS", "36"))
+# The scheduled scan is the paid call — run it less often than the live loop.
+SCHEDULED_SCAN_INTERVAL_SEC = int(os.environ.get("SCHEDULED_SCAN_INTERVAL_SEC", "1800"))
+
+# --- FlightAware query thrift (free Starter tier = 500 queries/month) ------
+# One combined /airports/{id}/flights call per airport per scan covers
+# scheduled arrivals+departures, enroute ETAs, diversions and cancellations.
+# Default cadence = every 6h (~4 automatic scans/day per airport) so a handful
+# of airports stay well inside the free Starter tier's 500 queries/month.
+FA_AIRPORT_SCAN_INTERVAL_SEC = int(os.environ.get("FA_AIRPORT_SCAN_INTERVAL_SEC", "21600"))
+# HARD monthly cap on FlightAware queries — the app refuses to call AeroAPI once
+# this many have been made in the current calendar month, so you can NEVER be
+# pushed past the free tier into a paid overage. Set below the real 500 limit.
+FA_MONTHLY_QUERY_BUDGET = int(os.environ.get("FA_MONTHLY_QUERY_BUDGET", "450"))
+# Global rare-jet fleet search is query-hungry — off unless explicitly enabled.
+FA_SEARCH_ENABLED = os.environ.get("FA_SEARCH_ENABLED", "0") == "1"
+# Follow-a-tail global tracking cadence.
+FA_FOLLOW_SCAN_INTERVAL_SEC = int(os.environ.get("FA_FOLLOW_SCAN_INTERVAL_SEC", "1800"))
+
+# --- Free live-feed extras (no key needed) --------------------------------
+# Emergency squawk watch (7500 hijack / 7600 radio-fail / 7700 general).
+EMERGENCY_SQUAWK_ENABLED = os.environ.get("EMERGENCY_SQUAWK_ENABLED", "1") == "1"
+# aviationweather.gov METAR (free, no key) — powers weather panel + runway-in-use.
+METAR_BASE = os.environ.get("METAR_BASE", "https://aviationweather.gov/api/data/metar")

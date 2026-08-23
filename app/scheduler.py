@@ -14,6 +14,9 @@ import time
 import traceback
 
 from . import config, db, engine, notify, sources, eta as eta_mod
+from . import flightaware as fa_mod
+
+_last_fa_scan = 0
 
 STATE = {
     "enabled": config.SCHEDULER_ENABLED,
@@ -69,6 +72,52 @@ def _refresh_all(hours: int) -> dict:
         totals["inbound"] = eta_mod.scan_all()
     except Exception as e:  # noqa: BLE001
         totals["inbound"] = {"error": str(e)}
+
+    # emergency squawk watch (free live feed) — 7500/7600/7700 near a field
+    if config.EMERGENCY_SQUAWK_ENABLED:
+        try:
+            from . import live_extras
+            emg = 0
+            with db.get_conn() as conn:
+                for ap in airports:
+                    if ap.get("lat") is None:
+                        continue
+                    for e in live_extras.emergencies_near(ap["lat"], ap["lon"], 120):
+                        reason = (f"EMERGENCY — {e['meaning']} (squawk {e['squawk']}) "
+                                  f"{e.get('dist_nm','?')} nm from {ap['icao']} · "
+                                  f"{e.get('reg') or e['icao24']} {e.get('type') or ''}".strip())
+                        cur = conn.execute(
+                            """INSERT OR IGNORE INTO alerts
+                               (airport_icao, icao24, direction, callsign, event_time,
+                                priority, reason, visit_count, created_at)
+                               SELECT ?,?,?,?,?,?,?,?,?
+                               WHERE NOT EXISTS (SELECT 1 FROM alerts WHERE airport_icao=?
+                                 AND icao24=? AND direction='emergency' AND event_time > ?)""",
+                            (ap["icao"], e["icao24"], "emergency", e.get("callsign"), end,
+                             "red", reason, 0, end, ap["icao"], e["icao24"], end - 1800))
+                        if cur.rowcount:
+                            emg += 1
+                conn.commit()
+            totals["emergencies"] = emg
+        except Exception as e:  # noqa: BLE001
+            totals["emergencies"] = {"error": str(e)}
+
+    # pre-takeoff / scheduled-arrival scan (FlightAware) — the paid call, so run
+    # it on its own slower cadence, not every loop.
+    global _last_fa_scan
+    fa_src = fa_mod.FlightAwareSource()
+    if fa_src.available() and fa_src.budget_ok() and (end - _last_fa_scan) >= config.FA_AIRPORT_SCAN_INTERVAL_SEC:
+        _last_fa_scan = end
+        sched = 0
+        for ap in airports:
+            if not fa_src.budget_ok():
+                break  # hard stop before the free-tier cap
+            try:
+                sched += fa_mod.scan_airport_flights(ap["icao"])["new_alerts"]
+            except Exception:  # noqa: BLE001
+                pass
+        totals["scheduled"] = sched
+        totals["fa_budget_remaining"] = fa_mod.budget_remaining()
 
     totals["dispatch"] = notify.dispatch_new()
     return totals
