@@ -444,6 +444,32 @@ def flightaware_scan(airport: str | None = None):
             "budget_remaining": fa_mod.budget_remaining()}
 
 
+@app.get("/api/flightaware/debug/{icao}")
+def flightaware_debug(icao: str):
+    """Diagnostic: show what FlightAware actually returns for an airport and
+    why flights were/weren't flagged notable. Uses one query."""
+    src = fa_mod.FlightAwareSource()
+    if not src.available():
+        return {"ok": False, "note": "no key"}
+    if not src.budget_ok():
+        return {"ok": False, "note": "budget reached"}
+    flights = src.airport_flights(icao.upper())
+    sched = flights.get("scheduled_arrivals", [])
+    sample = []
+    for fl in sched[:50]:
+        ac = fa_mod._notable_for_flight(fl)
+        sample.append({"ident": fl.get("ident"), "reg": fl.get("registration"),
+                       "type": fl.get("type"), "origin": fl.get("origin"),
+                       "notable": bool(ac), "cat": ac.get("category") if ac else None})
+    return {"ok": True,
+            "counts": {k: len(v) for k, v in flights.items()},
+            "scheduled_with_reg": sum(1 for f in sched if f.get("registration")),
+            "scheduled_with_type": sum(1 for f in sched if f.get("type")),
+            "notable_found": sum(1 for s in sample if s["notable"]),
+            "sample": sample,
+            "last_error": fa_mod.last_error()}
+
+
 @app.get("/api/flightaware/usage")
 def flightaware_usage():
     """FlightAware free-tier budget status for the current month."""
