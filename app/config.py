@@ -62,7 +62,7 @@ VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:alerts@spotalert.local")
 # --- FlightAware AeroAPI (optional) — enables pre-takeoff / scheduled alerts ---
 # Free Personal tier gives ~$5/month of queries. Get a key at
 # https://www.flightaware.com/commercial/aeroapi/  (My AeroAPI -> API key).
-FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY", "")
+FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY", "").strip()
 FLIGHTAWARE_BASE = os.environ.get("FLIGHTAWARE_BASE", "https://aeroapi.flightaware.com/aeroapi")
 # How far ahead to watch scheduled arrivals (hours). Airlines load schedules a
 # day+ out; filed GA/military plans usually same-day.

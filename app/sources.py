@@ -135,8 +135,9 @@ class AirplanesLiveSource:
                         "lon": ac.get("lon"),
                         "track": ac.get("track"),      # ground track (deg) — used by ETA heading filter
                         "squawk": ac.get("squawk"),    # transponder code — emergency detection
-                        # airplanes.live marks military with 'dbFlags' bit 1
+                        # airplanes.live dbFlags: bit1=military, bit2=interesting/special
                         "military": bool((ac.get("dbFlags") or 0) & 1),
+                        "interesting": bool((ac.get("dbFlags") or 0) & 2),
                     }
         except (httpx.HTTPError, ValueError):
             return

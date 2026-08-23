@@ -44,7 +44,7 @@ def overhead_now(lat: float, lon: float, radius_nm: int = 20) -> list[dict]:
             continue
         ac = ac_mod.classify(ac_mod.get_aircraft(c["icao24"]))
         notable = bool(ac.get("base_interest") or ac.get("interest_tags")
-                       or c.get("military"))
+                       or c.get("military") or c.get("interesting"))
         out.append({
             "icao24": c["icao24"], "callsign": c.get("callsign"),
             "reg": c.get("reg") or ac.get("registration"),

@@ -18,6 +18,14 @@ import httpx
 from . import config, aircraft as ac_mod
 
 
+# Last AeroAPI error seen (for the /usage diagnostic). None when healthy.
+_LAST_ERROR = None
+
+
+def last_error():
+    return _LAST_ERROR
+
+
 # ---- monthly query budget (hard guard against paid overage) --------------
 def _month_key() -> str:
     return time.strftime("%Y-%m", time.gmtime())
@@ -76,17 +84,20 @@ class FlightAwareSource:
             return None
         if not self.budget_ok():
             return None  # hard stop — monthly free-tier budget exhausted
+        global _LAST_ERROR
         headers = {"x-apikey": config.FLIGHTAWARE_API_KEY, "Accept": "application/json"}
         url = f"{config.FLIGHTAWARE_BASE}{path}"
         try:
             with httpx.Client(timeout=25, headers=headers) as c:
                 r = c.get(url, params=params or {})
                 _record_query(1)  # count every call that actually hit AeroAPI
-                if r.status_code in (401, 402, 403, 404):
+                if r.status_code >= 400:
+                    _LAST_ERROR = f"HTTP {r.status_code}: {(r.text or '')[:180]}"
                     return None
-                r.raise_for_status()
+                _LAST_ERROR = None
                 return r.json()
-        except (httpx.HTTPError, ValueError):
+        except (httpx.HTTPError, ValueError) as e:
+            _LAST_ERROR = f"{type(e).__name__}: {str(e)[:180]}"
             return None
 
     def airport_flights(self, airport_icao: str) -> dict:
@@ -205,15 +216,87 @@ def _lookup_by_reg(reg: str) -> dict | None:
     return dict(row) if row else None
 
 
-def _notable_ac_for_reg(reg: str) -> dict | None:
-    """Curated notable airframe for a registration, classified, else None."""
-    reg = (reg or "").upper()
-    if not reg:
-        return None
-    ac = _lookup_by_reg(reg)
-    if not ac or not ac.get("base_interest"):
-        return None
-    return ac_mod.classify(ac)
+# Inherently interesting airframe types even when the specific tail isn't
+# curated — quads, big widebodies, and rare/vintage frames spotters chase.
+RARE_TYPES = {
+    "A388", "A380", "B748", "B744", "B742", "B741", "BLCF", "A346", "A345",
+    "A343", "A342", "MD11", "B762", "AN124", "A124", "AN225", "A225", "IL76",
+    "IL96", "C5M", "C5", "B703", "CONC", "DC10", "MD87", "B77L", "B74S", "B74R",
+}
+NOTABLE_CATS = ("military", "gov", "warbird", "tanker", "testbed", "special")
+
+# Genuine business-jet ICAO types (inherently notable) — deliberately EXCLUDES
+# airliner types like B737/A320 that the generic classifier would over-flag.
+BIZJET_TYPES = {
+    "GLF2", "GLF3", "GLF4", "GLF5", "GLF6", "GL5T", "GL6T", "GL7T", "GLEX",
+    "G650", "G280", "GALX", "C68A", "C700", "C750", "C56X", "C560", "C680",
+    "C525", "C25A", "C25B", "C25C", "C510", "FA7X", "FA8X", "FA6X", "F900",
+    "F2TH", "FA50", "CL60", "CL30", "CL35", "E55P", "E50P", "E545", "E550",
+    "PC24", "HDJT", "LJ60", "LJ75", "LJ45", "LJ35", "H25B", "H25C", "PRM1",
+    "BE40", "BBJ", "GA5C", "GA6C", "GA7C",
+}
+
+
+def _notable_for_flight(fl: dict) -> dict | None:
+    """Notable airframe for a scheduled flight — by curated tail OR by type.
+
+    1) If the registration is a curated base-interest frame (special livery,
+       warbird, watched, etc.) use that.
+    2) Otherwise flag inherently-notable *types*: military / warbird / large
+       private (via the classifier's heuristics) or a rare widebody/quad.
+    Returns a classified aircraft dict with a usable icao24 key, else None.
+    """
+    from . import liveries
+    reg = (fl.get("registration") or "").upper()
+    tc = (fl.get("type") or "").upper()
+    ident = (fl.get("ident") or "").upper()
+    # sports/team & pro charters — matched by known charter-operator callsign
+    # prefixes. STARTER set; grow it as you spot more.
+    CHARTER_ICAO = ("OAE", "SWQ", "MMZ", "RYW", "EGF", "CKS", "GXA", "VTE", "SNC")
+    if ident[:3] in CHARTER_ICAO:
+        return {"icao24": (reg or ident).lower(), "registration": reg or None,
+                "typecode": tc or None, "model": None, "operator": None,
+                "category": "charter", "interest_tags": ["charter"],
+                "base_interest": 1, "is_blocked": False}
+    # 1a) curated special livery (works without the identity DB) — any tail we
+    #     know wears a special/heritage scheme, matched purely by registration.
+    if reg:
+        lv = liveries.lookup(reg)
+        if lv:
+            category, tags = lv
+            return {"icao24": reg.lower(), "registration": reg, "typecode": tc or None,
+                    "model": None, "operator": None, "category": category,
+                    "interest_tags": tags, "base_interest": 1, "is_blocked": False}
+    # 1b) curated tail already in the identity DB (watched / base-interest)
+    if reg:
+        ac = _lookup_by_reg(reg)
+        if ac and ac.get("base_interest"):
+            ac = ac_mod.classify(ac)
+            if ac.get("icao24"):
+                return ac
+    # 2) inherently-notable type
+    if tc:
+        guess = ac_mod.classify({"icao24": "", "registration": reg or None,
+                                 "typecode": tc, "model": None, "operator": None,
+                                 "category": "unknown", "interest_tags": "",
+                                 "base_interest": 0})
+        is_rare = tc in RARE_TYPES
+        is_biz = tc in BIZJET_TYPES
+        # only military/warbird/etc (real heuristic types), rare widebodies, or
+        # genuine bizjets — NOT ordinary airliner types.
+        is_mil = guess.get("category") in NOTABLE_CATS
+        if is_mil or is_rare or is_biz:
+            key = (reg or fl.get("ident") or tc).lower()
+            guess["icao24"] = key
+            guess["registration"] = reg or None
+            if is_rare and guess.get("category") in ("unknown", "airliner", None):
+                guess["interest_tags"] = ["widebody-rare"]
+                guess["category"] = "special"
+            elif is_biz and guess.get("category") in ("unknown", None):
+                guess["interest_tags"] = ["large-private"]
+                guess["category"] = "private"
+            return guess
+    return None
 
 
 def _emit_alert(conn, airport_icao, icao24, direction, ident, event_time,
@@ -252,7 +335,7 @@ def scan_airport_flights(airport_icao: str) -> dict:
     with db.get_conn() as conn:
         # --- arrivals side: pre-takeoff, enroute ETA, diversion, cancelled ---
         for fl in flights.get("scheduled_arrivals", []) + flights.get("arrivals", []):
-            ac = _notable_ac_for_reg(fl.get("registration"))
+            ac = _notable_for_flight(fl)
             if not ac or not ac.get("icao24"):
                 continue
             hex_ = ac["icao24"]
@@ -293,7 +376,7 @@ def scan_airport_flights(airport_icao: str) -> dict:
 
         # --- departures side: notable jet about to LEAVE this airport ---
         for fl in flights.get("scheduled_departures", []) + flights.get("departures", []):
-            ac = _notable_ac_for_reg(fl.get("registration"))
+            ac = _notable_for_flight(fl)
             if not ac or not ac.get("icao24") or fl.get("actual_off"):
                 continue
             dep = fl.get("estimated_off") or fl.get("scheduled_off")

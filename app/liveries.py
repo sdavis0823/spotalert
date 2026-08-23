@@ -28,6 +28,15 @@ CURATED_LIVERIES = [
 ]
 
 
+_BY_REG = {reg.upper(): (category, tags) for reg, category, tags in CURATED_LIVERIES}
+
+
+def lookup(reg: str):
+    """Return (category, tags) for a curated special-livery tail, else None.
+    Works without the DB — used to flag special liveries in scheduled arrivals."""
+    return _BY_REG.get((reg or "").upper())
+
+
 def apply(conn) -> int:
     """Tag every curated livery whose registration already exists in the
     aircraft table (i.e. after the identity DB is loaded). Returns how many

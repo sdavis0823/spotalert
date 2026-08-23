@@ -439,7 +439,8 @@ def flightaware_usage():
     return {"enabled": src.available(),
             "used": fa_mod.usage_this_month(),
             "budget": config.FA_MONTHLY_QUERY_BUDGET,
-            "remaining": fa_mod.budget_remaining()}
+            "remaining": fa_mod.budget_remaining(),
+            "last_error": fa_mod.last_error()}
 
 
 class SearchQuery(BaseModel):
