@@ -79,6 +79,16 @@ CURATED_LIVERIES = [
     ("VH-XZP", "special", ["retro", "retro-roo"]),         # Qantas
     ("TS-IOP", "special", ["retro", "tunisair"]),
     ("VT-ATV", "special", ["retro", "vistara"]),
+    # ---- Asia-Pacific specials (newer) ----
+    ("B-58553", "special", ["special-livery", "starlux-silver-airsorayama"]),  # Starlux A350-1000
+    ("B-16331", "special", ["special-livery", "eva-badtz-maru"]),              # EVA Hello Kitty A330
+    ("B-16332", "special", ["special-livery", "eva-sanrio-joyful-dream"]),     # EVA Hello Kitty A330
+    ("B-16333", "special", ["special-livery", "eva-hello-kitty"]),             # EVA Hello Kitty A330
+    ("B-16722", "special", ["special-livery", "eva-besties-jet"]),             # EVA Hello Kitty 777
+    ("JA873A", "special", ["special-livery", "ana-star-wars-r2d2"]),           # ANA 787-9
+    ("JA789A", "special", ["special-livery", "ana-star-wars-bb8"]),            # ANA 777-300ER
+    ("JA743A", "special", ["special-livery", "ana-star-wars-c3po"]),           # ANA 777-200ER
+    ("JA604A", "special", ["special-livery", "ana-star-wars"]),               # ANA 767-300ER
 ]
 
 
