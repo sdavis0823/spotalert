@@ -54,6 +54,24 @@ def get_aircraft(icao24: str) -> dict:
             "model": None, "operator": None, "category": "unknown",
             "interest_tags": "", "base_interest": 0,
         }
+    # Overlay the community notable registry (Plane-Alert-DB) by hex — flags
+    # ~17k special-interest tails the curated DB doesn't know about.
+    if not d.get("base_interest"):
+        try:
+            from . import notable_registry as nreg
+            reg, info = nreg.by_hex(icao24)
+            if info:
+                d["base_interest"] = 1
+                if not d.get("category") or d["category"] == "unknown":
+                    d["category"] = info.get("c") or "special"
+                if not d.get("registration"):
+                    d["registration"] = reg
+                if not d.get("operator"):
+                    d["operator"] = info.get("o")
+                if not d.get("interest_tags"):
+                    d["interest_tags"] = ",".join(info.get("g") or [])
+        except Exception:  # noqa: BLE001
+            pass
     return d
 
 

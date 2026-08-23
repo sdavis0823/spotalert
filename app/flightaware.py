@@ -273,9 +273,20 @@ def _notable_for_flight(fl: dict) -> dict | None:
     Returns a classified aircraft dict with a usable icao24 key, else None.
     """
     from . import liveries
+    from . import notable_registry as nreg
     reg = (fl.get("registration") or "").upper()
     tc = (fl.get("type") or "").upper()
     ident = (fl.get("ident") or "").upper()
+    # 0) community notable-aircraft registry (~17k tails: military, gov, historic,
+    #    firefighters, testbeds, celebrity/distinctive) — matched by registration.
+    if reg:
+        info = nreg.by_reg(reg)
+        if info:
+            return {"icao24": (info.get("h") or reg).lower(), "registration": reg,
+                    "typecode": tc or info.get("t"), "model": None,
+                    "operator": info.get("o"), "category": info.get("c") or "special",
+                    "interest_tags": info.get("g") or [], "base_interest": 1,
+                    "is_blocked": info.get("c") in ("military", "gov")}
     # sports/team & pro charters — matched by known charter-operator callsign
     # prefixes. STARTER set; grow it as you spot more.
     CHARTER_ICAO = ("OAE", "SWQ", "MMZ", "RYW", "EGF", "CKS", "GXA", "VTE", "SNC")
