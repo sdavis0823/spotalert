@@ -390,10 +390,13 @@ function jtName(e){
 function jtTint(e){
   const d=e.direction||'',tags=(e.interest_tags||[]);
   if(d==='emergency')return'jt-red';
+  // special paint / retro / heritage -> blue highlight
   if(e.category==='special'||tags.some(t=>/livery|retro|heritage/i.test(t)))return'jt-blue';
-  if(['scheduled','enroute','inbound','departing','diversion'].includes(d)
-     ||e.category==='charter'||tags.includes('widebody-rare'))return'jt-peach';
-  return'';
+  // charters, rare widebodies, diversions -> peach highlight
+  if(e.category==='charter'||tags.includes('widebody-rare')||d==='diversion')return'jt-peach';
+  // military / gov / warbird / tanker / testbed -> peach highlight
+  if(['military','gov','warbird','tanker','testbed'].includes(e.category))return'jt-peach';
+  return'';   // ordinary scheduled traffic stays white, like JetTip
 }
 function jtStatus(e){
   const d=e.direction||'';
