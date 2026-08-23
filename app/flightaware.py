@@ -168,7 +168,9 @@ def _iso_to_epoch(s):
 
 def _code(d):
     d = d or {}
-    return d.get("code") or d.get("code_icao") or d.get("code_iata")
+    # Prefer IATA (SEA, OGG, LAX) so the board reads like JetTip; fall back to
+    # ICAO for GA/military fields that have no IATA code.
+    return d.get("code_iata") or d.get("code") or d.get("code_icao")
 
 
 def _parse_flight(f: dict) -> dict:
