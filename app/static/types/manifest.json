@@ -1,0 +1,447 @@
+[
+{
+"slug": "gulfstream-g500",
+"name": "Gulfstream G500",
+"category": "private"
+},
+{
+"slug": "gulfstream-g650er",
+"name": "Gulfstream G650ER",
+"category": "private"
+},
+{
+"slug": "gulfstream-g700",
+"name": "Gulfstream G700",
+"category": "private"
+},
+{
+"slug": "gulfstream-g800",
+"name": "Gulfstream G800",
+"category": "private"
+},
+{
+"slug": "global-6500",
+"name": "Global 6500",
+"category": "private"
+},
+{
+"slug": "global-7500",
+"name": "Global 7500",
+"category": "private"
+},
+{
+"slug": "challenger-3500",
+"name": "Challenger 3500",
+"category": "private"
+},
+{
+"slug": "challenger-650",
+"name": "Challenger 650",
+"category": "private"
+},
+{
+"slug": "falcon-6x",
+"name": "Falcon 6X",
+"category": "private"
+},
+{
+"slug": "falcon-8x",
+"name": "Falcon 8X",
+"category": "private"
+},
+{
+"slug": "falcon-900lx",
+"name": "Falcon 900LX",
+"category": "private"
+},
+{
+"slug": "citation-longitude",
+"name": "Citation Longitude",
+"category": "private"
+},
+{
+"slug": "citation-latitude",
+"name": "Citation Latitude",
+"category": "private"
+},
+{
+"slug": "phenom-300e",
+"name": "Phenom 300E",
+"category": "private"
+},
+{
+"slug": "hondajet-elite-ii",
+"name": "HondaJet Elite II",
+"category": "private"
+},
+{
+"slug": "pilatus-pc-24",
+"name": "Pilatus PC-24",
+"category": "private"
+},
+{
+"slug": "citation-cj1",
+"name": "Citation CJ1+",
+"category": "private"
+},
+{
+"slug": "citation-cj2",
+"name": "Citation CJ2+",
+"category": "private"
+},
+{
+"slug": "citation-cj3",
+"name": "Citation CJ3+",
+"category": "private"
+},
+{
+"slug": "citation-cj4-gen2",
+"name": "Citation CJ4 Gen2",
+"category": "private"
+},
+{
+"slug": "citation-m2-gen2",
+"name": "Citation M2 Gen2",
+"category": "private"
+},
+{
+"slug": "citation-xls",
+"name": "Citation XLS+",
+"category": "private"
+},
+{
+"slug": "citation-sovereign",
+"name": "Citation Sovereign+",
+"category": "private"
+},
+{
+"slug": "citation-x",
+"name": "Citation X+",
+"category": "private"
+},
+{
+"slug": "learjet-45xr",
+"name": "Learjet 45XR",
+"category": "private"
+},
+{
+"slug": "learjet-60xr",
+"name": "Learjet 60XR",
+"category": "private"
+},
+{
+"slug": "learjet-75",
+"name": "Learjet 75",
+"category": "private"
+},
+{
+"slug": "hawker-400xp",
+"name": "Hawker 400XP",
+"category": "private"
+},
+{
+"slug": "hawker-800xp",
+"name": "Hawker 800XP",
+"category": "private"
+},
+{
+"slug": "hawker-900xp",
+"name": "Hawker 900XP",
+"category": "private"
+},
+{
+"slug": "gulfstream-g280",
+"name": "Gulfstream G280",
+"category": "private"
+},
+{
+"slug": "gulfstream-g450",
+"name": "Gulfstream G450",
+"category": "private"
+},
+{
+"slug": "gulfstream-g550",
+"name": "Gulfstream G550",
+"category": "private"
+},
+{
+"slug": "gulfstream-g600",
+"name": "Gulfstream G600",
+"category": "private"
+},
+{
+"slug": "global-5000",
+"name": "Global 5000",
+"category": "private"
+},
+{
+"slug": "global-5500",
+"name": "Global 5500",
+"category": "private"
+},
+{
+"slug": "global-6000",
+"name": "Global 6000",
+"category": "private"
+},
+{
+"slug": "falcon-2000lxs",
+"name": "Falcon 2000LXS",
+"category": "private"
+},
+{
+"slug": "falcon-7x",
+"name": "Falcon 7X",
+"category": "private"
+},
+{
+"slug": "praetor-500e",
+"name": "Praetor 500E",
+"category": "private"
+},
+{
+"slug": "praetor-600e",
+"name": "Praetor 600E",
+"category": "private"
+},
+{
+"slug": "airbus-a220-300",
+"name": "Airbus A220-300",
+"category": "airliner"
+},
+{
+"slug": "airbus-a319neo",
+"name": "Airbus A319neo",
+"category": "airliner"
+},
+{
+"slug": "airbus-a320neo",
+"name": "Airbus A320neo",
+"category": "airliner"
+},
+{
+"slug": "airbus-a321neo",
+"name": "Airbus A321neo",
+"category": "airliner"
+},
+{
+"slug": "airbus-a330-300",
+"name": "Airbus A330-300",
+"category": "airliner"
+},
+{
+"slug": "airbus-a330-900neo",
+"name": "Airbus A330-900neo",
+"category": "airliner"
+},
+{
+"slug": "airbus-a340-600",
+"name": "Airbus A340-600",
+"category": "airliner"
+},
+{
+"slug": "airbus-a350-900",
+"name": "Airbus A350-900",
+"category": "airliner"
+},
+{
+"slug": "airbus-a350-1000",
+"name": "Airbus A350-1000",
+"category": "airliner"
+},
+{
+"slug": "airbus-a380-800",
+"name": "Airbus A380-800",
+"category": "airliner"
+},
+{
+"slug": "boeing-717-200",
+"name": "Boeing 717-200",
+"category": "airliner"
+},
+{
+"slug": "boeing-737-800",
+"name": "Boeing 737-800",
+"category": "airliner"
+},
+{
+"slug": "boeing-737-max-8",
+"name": "Boeing 737 MAX 8",
+"category": "airliner"
+},
+{
+"slug": "boeing-747-8",
+"name": "Boeing 747-8",
+"category": "airliner"
+},
+{
+"slug": "boeing-757-200",
+"name": "Boeing 757-200",
+"category": "airliner"
+},
+{
+"slug": "boeing-767-300er",
+"name": "Boeing 767-300ER",
+"category": "airliner"
+},
+{
+"slug": "boeing-777-300er",
+"name": "Boeing 777-300ER",
+"category": "airliner"
+},
+{
+"slug": "boeing-787-9",
+"name": "Boeing 787-9",
+"category": "airliner"
+},
+{
+"slug": "boeing-787-10",
+"name": "Boeing 787-10",
+"category": "airliner"
+},
+{
+"slug": "embraer-e175",
+"name": "Embraer E175",
+"category": "airliner"
+},
+{
+"slug": "embraer-e190-e2",
+"name": "Embraer E190-E2",
+"category": "airliner"
+},
+{
+"slug": "embraer-e195-e2",
+"name": "Embraer E195-E2",
+"category": "airliner"
+},
+{
+"slug": "crj900",
+"name": "CRJ900",
+"category": "airliner"
+},
+{
+"slug": "atr-72-600",
+"name": "ATR 72-600",
+"category": "airliner"
+},
+{
+"slug": "dash-8-q400",
+"name": "Dash 8 Q400",
+"category": "airliner"
+},
+{
+"slug": "md-80",
+"name": "MD-80",
+"category": "airliner"
+},
+{
+"slug": "md-11",
+"name": "MD-11",
+"category": "airliner"
+},
+{
+"slug": "robinson-r44",
+"name": "Robinson R44",
+"category": "helicopter"
+},
+{
+"slug": "robinson-r66",
+"name": "Robinson R66",
+"category": "helicopter"
+},
+{
+"slug": "bell-206-jetranger",
+"name": "Bell 206 JetRanger",
+"category": "helicopter"
+},
+{
+"slug": "bell-407",
+"name": "Bell 407",
+"category": "helicopter"
+},
+{
+"slug": "airbus-h125",
+"name": "Airbus H125",
+"category": "helicopter"
+},
+{
+"slug": "airbus-h145",
+"name": "Airbus H145",
+"category": "helicopter"
+},
+{
+"slug": "sikorsky-s-76",
+"name": "Sikorsky S-76",
+"category": "helicopter"
+},
+{
+"slug": "aw139",
+"name": "AW139",
+"category": "helicopter"
+},
+{
+"slug": "uh-60-black-hawk",
+"name": "UH-60 Black Hawk",
+"category": "helicopter"
+},
+{
+"slug": "ah-64-apache",
+"name": "AH-64 Apache",
+"category": "helicopter"
+},
+{
+"slug": "ch-47-chinook",
+"name": "CH-47 Chinook",
+"category": "helicopter"
+},
+{
+"slug": "bell-429",
+"name": "Bell 429",
+"category": "helicopter"
+},
+{
+"slug": "bell-505-jet-ranger-x",
+"name": "Bell 505 Jet Ranger X",
+"category": "helicopter"
+},
+{
+"slug": "bell-412epx",
+"name": "Bell 412EPX",
+"category": "helicopter"
+},
+{
+"slug": "airbus-h130",
+"name": "Airbus H130",
+"category": "helicopter"
+},
+{
+"slug": "airbus-h135",
+"name": "Airbus H135",
+"category": "helicopter"
+},
+{
+"slug": "airbus-h160",
+"name": "Airbus H160",
+"category": "helicopter"
+},
+{
+"slug": "sikorsky-s-92",
+"name": "Sikorsky S-92",
+"category": "helicopter"
+},
+{
+"slug": "leonardo-aw109",
+"name": "Leonardo AW109",
+"category": "helicopter"
+},
+{
+"slug": "leonardo-aw169",
+"name": "Leonardo AW169",
+"category": "helicopter"
+},
+{
+"slug": "md-500e",
+"name": "MD 500E",
+"category": "helicopter"
+}
+]
