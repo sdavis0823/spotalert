@@ -17,6 +17,7 @@ from . import config, db, engine, notify, sources, eta as eta_mod
 from . import flightaware as fa_mod
 
 _last_fa_scan = 0
+_last_registry_refresh = 0
 
 STATE = {
     "enabled": config.SCHEDULER_ENABLED,
@@ -118,6 +119,16 @@ def _refresh_all(hours: int) -> dict:
                 pass
         totals["scheduled"] = sched
         totals["fa_budget_remaining"] = fa_mod.budget_remaining()
+
+    # weekly auto-refresh of the community notable-aircraft registry
+    global _last_registry_refresh
+    if (end - _last_registry_refresh) >= config.REGISTRY_REFRESH_INTERVAL_SEC:
+        _last_registry_refresh = end
+        try:
+            from . import notable_registry as nreg
+            totals["registry_refresh"] = nreg.refresh_from_source()
+        except Exception as e:  # noqa: BLE001
+            totals["registry_refresh"] = {"ok": False, "error": str(e)[:120]}
 
     totals["dispatch"] = notify.dispatch_new()
     return totals
