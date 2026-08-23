@@ -112,6 +112,7 @@ CURATED_LIVERIES = [
     ("VT-ATV", "special", ["retro", "vistara"]),
     # ---- Asia-Pacific specials (newer) ----
     ("B-58553", "special", ["special-livery", "starlux-silver-airsorayama"]),  # Starlux A350-1000
+    ("B-58554", "special", ["special-livery", "starlux-gold-airsorayama"]),    # Starlux A350-1000 (Aug 2026)
     ("B-16331", "special", ["special-livery", "eva-badtz-maru"]),              # EVA Hello Kitty A330
     ("B-16332", "special", ["special-livery", "eva-sanrio-joyful-dream"]),     # EVA Hello Kitty A330
     ("B-16333", "special", ["special-livery", "eva-hello-kitty"]),             # EVA Hello Kitty A330
