@@ -205,6 +205,12 @@
     border-radius:999px;padding:4px 11px;text-transform:uppercase;letter-spacing:.03em}
   .ap-r.have .ap-add{color:#0e9f66;border-color:#bfe9d5;background:#eafaf2}
   .ap-hint{color:var(--faint);font-size:13px;text-align:center;padding:26px 10px}
+  html{overscroll-behavior-y:contain}
+  #ptr{position:fixed;top:10px;left:50%;transform:translateX(-50%) translateY(-10px);z-index:300;width:38px;height:38px;
+    border-radius:50%;background:var(--surface);box-shadow:var(--shadow-lg);display:grid;place-items:center;color:var(--brand);
+    font-size:19px;opacity:0;transition:opacity .18s;pointer-events:none}
+  #ptr.spin{animation:ptrspin .7s linear infinite}
+  @keyframes ptrspin{from{transform:translateX(-50%) rotate(0)}to{transform:translateX(-50%) rotate(360deg)}}
   .catbar{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px}
   .catchip{cursor:pointer;user-select:none;border:1px solid var(--line2);background:var(--surface);color:var(--dim);
     border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;transition:.12s;white-space:nowrap}
@@ -869,6 +875,21 @@ function wireApModal(){
   };
   document.addEventListener("keydown",e=>{if(e.key==="Escape")apCloseModal();});
 }
+
+// pull-to-refresh (mobile) — pull down at the top to reload fresh data
+(function(){
+  let startY=0,pulling=false,ind=null;
+  const el=()=>{ if(!ind){ind=document.createElement('div');ind.id='ptr';ind.textContent='↻';document.body.appendChild(ind);} return ind; };
+  const atTop=()=>(document.scrollingElement||document.documentElement).scrollTop<=0;
+  addEventListener('touchstart',e=>{ if(atTop()){startY=e.touches[0].clientY;pulling=true;} },{passive:true});
+  addEventListener('touchmove',e=>{ if(!pulling)return; const dy=e.touches[0].clientY-startY;
+    if(dy>0&&atTop()){ const p=el(); p.style.opacity=Math.min(1,dy/90); p.style.transform='translateX(-50%) translateY('+Math.min(dy*0.5,60)+'px)'; }
+    else { pulling=false; if(ind)ind.style.opacity=0; } },{passive:true});
+  addEventListener('touchend',e=>{ if(!pulling){return;} const dy=e.changedTouches[0].clientY-startY; pulling=false;
+    const p=el();
+    if(dy>90&&atTop()){ p.style.opacity=1; p.classList.add('spin'); setTimeout(()=>location.reload(),150); }
+    else { p.style.opacity=0; } });
+})();
 
 async function init(){
   AIRPORTS=await j("/api/airports");
