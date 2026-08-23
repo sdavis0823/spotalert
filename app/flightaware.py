@@ -194,6 +194,68 @@ def _parse_flight(f: dict) -> dict:
     }
 
 
+# Compact ICAO airline-code -> display name map so ordinary board rows read like
+# JetTip ("AMERICAN AIRLINES", "SOUTHWEST") instead of a bare type code.
+AIRLINE_ICAO = {
+    "AAL": "American Airlines", "SWA": "Southwest", "DAL": "Delta", "UAL": "United",
+    "ASA": "Alaska", "JBU": "JetBlue", "NKS": "Spirit", "FFT": "Frontier",
+    "HAL": "Hawaiian", "SCX": "Sun Country", "AAY": "Allegiant", "QXE": "Horizon",
+    "SKW": "SkyWest", "ENY": "Envoy", "RPA": "Republic", "EDV": "Endeavor",
+    "FDX": "FedEx", "UPS": "UPS", "GTI": "Atlas Air", "ABX": "ABX Air",
+    "ACA": "Air Canada", "WJA": "WestJet", "AMX": "Aeroméxico", "VOI": "Volaris",
+    "BAW": "British Airways", "DLH": "Lufthansa", "AFR": "Air France", "KLM": "KLM",
+    "UAE": "Emirates", "QTR": "Qatar Airways", "ANA": "ANA", "JAL": "JAL",
+    "CPA": "Cathay Pacific", "SIA": "Singapore Airlines", "QFA": "Qantas",
+    "ACA": "Air Canada", "AMX": "Aeroméxico", "CES": "China Eastern",
+    "CSN": "China Southern", "CCA": "Air China", "AIC": "Air India",
+}
+
+
+def _airline_from_ident(ident):
+    if not ident:
+        return None
+    return AIRLINE_ICAO.get(ident[:3].upper())
+
+
+def _store_scheduled_board(conn, airport_icao, arrivals, departures, now, horizon):
+    """Cache EVERY scheduled arrival & departure (not just notable) so the board
+    can show the full JetTip-style list. Same data the scan already fetched — no
+    extra AeroAPI queries. Replaces the airport's rows each scan."""
+    conn.execute("DELETE FROM scheduled_flights WHERE airport_icao=?", (airport_icao,))
+    rows = []
+
+    def _row(fl, direction, when):
+        if not when or when < now - 1800 or when > horizon:
+            return None
+        ac = _notable_for_flight(fl)
+        reg = fl.get("registration")
+        ident = fl.get("ident")
+        notable = 1 if ac and ac.get("icao24") else 0
+        operator = (ac.get("operator") if ac else None) or _airline_from_ident(ident)
+        icao24 = (ac.get("icao24") if ac else None) or (reg or ident or "").lower() or None
+        cat = ac.get("category") if ac else None
+        tags = ",".join(ac.get("interest_tags") or []) if ac else None
+        return (airport_icao, direction, ident, reg, fl.get("type"),
+                fl.get("origin"), fl.get("destination"), int(when), operator,
+                icao24, notable, cat, tags, fl.get("status"), now)
+
+    for fl in arrivals:
+        r = _row(fl, "arrival", fl.get("estimated_on") or fl.get("scheduled_on"))
+        if r:
+            rows.append(r)
+    for fl in departures:
+        r = _row(fl, "departure", fl.get("estimated_off") or fl.get("scheduled_off"))
+        if r:
+            rows.append(r)
+    if rows:
+        conn.executemany(
+            """INSERT OR IGNORE INTO scheduled_flights
+               (airport_icao,direction,ident,registration,type,origin,destination,
+                event_time,operator,icao24,notable,category,tags,status,updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
+    return len(rows)
+
+
 def notable_scheduled(airport_icao: str) -> list[dict]:
     """Scheduled arrivals filtered to notable airframes, with lead-time info.
 
@@ -384,7 +446,17 @@ def scan_airport_flights(airport_icao: str) -> dict:
         seen_idents.add(k)
         arrivals_all.append(fl)
 
+    departures_all = flights.get("scheduled_departures", []) + flights.get("departures", [])
+
     with db.get_conn() as conn:
+        # Cache the FULL board (every arrival & departure, notable or not) so the
+        # UI can show everything coming in like JetTip. No extra AeroAPI queries.
+        try:
+            _store_scheduled_board(conn, airport_icao, arrivals_all, departures_all,
+                                   now, horizon)
+        except Exception:  # noqa: BLE001 — board cache is best-effort
+            pass
+
         # --- arrivals side: pre-takeoff, enroute ETA, diversion, cancelled ---
         for fl in arrivals_all:
             ac = _notable_for_flight(fl)
@@ -427,7 +499,7 @@ def scan_airport_flights(airport_icao: str) -> dict:
                     created += 1; kinds["scheduled"] += 1
 
         # --- departures side: notable jet about to LEAVE this airport ---
-        for fl in flights.get("scheduled_departures", []) + flights.get("departures", []):
+        for fl in departures_all:
             ac = _notable_for_flight(fl)
             if not ac or not ac.get("icao24") or fl.get("actual_off"):
                 continue

@@ -108,35 +108,45 @@ def _route_code_from_reason(reason, airport_icao):
 
 
 def _scheduled_board_events(conn, icao, now):
-    """Upcoming FlightAware rows (scheduled / enroute / departing / diversion)
-    for this airport, shaped like board events and carrying the parsed route
-    code. These are the 'coming into <airport>' rows JetTip shows as PLANNED."""
+    """The FULL upcoming board from the scheduled-flight cache — every arrival &
+    departure FlightAware returned, notable or not (JetTip's 'everything coming
+    in'). Notable rows carry a category/tags so the UI highlights them; the
+    right-hand code is the endpoint that isn't this airport."""
+    ap = {icao.upper(), icao.upper().lstrip("K")}
+
+    def _code(c):
+        return _iata_ish(c) if c else None
+
     rows = conn.execute(
-        """SELECT * FROM alerts WHERE airport_icao=? AND event_time > ?
-             AND direction IN ('scheduled','enroute','departing','diversion')
-           ORDER BY event_time ASC LIMIT 300""",
-        (icao, now - 3600)).fetchall()
+        """SELECT * FROM scheduled_flights WHERE airport_icao=? AND event_time > ?
+           ORDER BY event_time ASC LIMIT 400""",
+        (icao, now - 1800)).fetchall()
     out = []
     for r in rows:
-        ac = ac_mod.classify(ac_mod.get_aircraft(r["icao24"]))
+        # far endpoint: origin for arrivals, destination for departures
+        far = r["origin"] if r["direction"] == "arrival" else r["destination"]
+        if not far or far.upper() in ap:
+            far = r["destination"] if r["direction"] == "arrival" else r["origin"]
+        tags = [t for t in (r["tags"] or "").split(",") if t]
+        direction = "scheduled" if r["direction"] == "arrival" else "departing"
         out.append({
             "icao24": r["icao24"],
-            "callsign": r["callsign"],
-            "direction": r["direction"],
+            "callsign": r["ident"],
+            "direction": direction,
             "event_time": r["event_time"],
-            "registration": ac.get("registration"),
-            "type": ac.get("typecode"),
-            "model": ac.get("model"),
-            "operator": ac.get("operator"),
-            "category": ac.get("category"),
-            "interest_tags": ac.get("interest_tags"),
-            "is_blocked": ac.get("is_blocked"),
-            "display": ac_mod.display_name(ac),
-            "type_art": type_art.resolve(ac.get("typecode"), ac.get("model")),
-            "priority": r["priority"],
-            "reason": r["reason"],
-            "eta_minutes": r["eta_minutes"],
-            "route_code": _route_code_from_reason(r["reason"], icao),
+            "registration": r["registration"],
+            "type": r["type"],
+            "model": None,
+            "operator": r["operator"],
+            "category": r["category"],
+            "interest_tags": tags,
+            "is_blocked": r["category"] in ("military", "gov"),
+            "display": None,
+            "type_art": type_art.resolve(r["type"], None),
+            "priority": "red" if r["notable"] else None,
+            "notable": bool(r["notable"]),
+            "eta_minutes": None,
+            "route_code": _code(far),
         })
     return out
 
@@ -255,6 +265,8 @@ def board(icao: str, hours: int = Query(48, ge=1, le=720),
         now = int(time.time())
         seen = {(e["icao24"], e["direction"], e["event_time"]) for e in out}
         for se in _scheduled_board_events(conn, icao, now):
+            if notable_only and not se.get("notable"):
+                continue
             key = (se["icao24"], se["direction"], se["event_time"])
             if key in seen:
                 continue

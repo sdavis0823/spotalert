@@ -128,6 +128,29 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_push_email ON push_subscriptions(email);
+
+-- Full scheduled-flight board cache (JetTip-style "everything coming in").
+-- Populated from the SAME FlightAware scan (no extra queries); every arrival &
+-- departure is stored, notable ones flagged. Replaced per airport each scan.
+CREATE TABLE IF NOT EXISTS scheduled_flights (
+    airport_icao TEXT NOT NULL,
+    direction    TEXT NOT NULL,      -- 'arrival' | 'departure'
+    ident        TEXT,
+    registration TEXT,
+    type         TEXT,
+    origin       TEXT,
+    destination  TEXT,
+    event_time   INTEGER NOT NULL,   -- scheduled/estimated arr or dep epoch (UTC)
+    operator     TEXT,
+    icao24       TEXT,
+    notable      INTEGER DEFAULT 0,
+    category     TEXT,
+    tags         TEXT,
+    status       TEXT,
+    updated_at   INTEGER NOT NULL,
+    UNIQUE(airport_icao, direction, ident, event_time)
+);
+CREATE INDEX IF NOT EXISTS idx_sched_ap ON scheduled_flights(airport_icao, event_time);
 """
 
 
