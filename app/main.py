@@ -12,6 +12,7 @@ Endpoints
 """
 import time
 import os
+import re
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -76,6 +77,68 @@ def _enrich_event_row(conn, row):
         "display": ac_mod.display_name(ac),
         "type_art": type_art.resolve(ac.get("typecode"), ac.get("model")),
     }
+
+
+# route code (SEA, LAX, …) lives inside the FlightAware alert reason text, e.g.
+# "SCHEDULED — SEA → KPHX, …" or "… KPHX → LAX in ~20 min". Pull the endpoint
+# that ISN'T the tracked airport so the board's right column reads like JetTip.
+_ROUTE_RE = re.compile(r"\b([A-Z]{3,4})\s*(?:→|-+>|>)\s*([A-Z]{3,4})\b")
+_WAS_RE = re.compile(r"\(was\s+([A-Z]{3,4})\)")
+
+
+def _iata_ish(code):
+    """US ICAO codes are K+3 letters; JetTip shows the 3-letter form (KLAS->LAS)."""
+    if code and len(code) == 4 and code[0] == "K" and code[1:].isalpha():
+        return code[1:]
+    return code
+
+
+def _route_code_from_reason(reason, airport_icao):
+    if not reason:
+        return None
+    ap = {airport_icao.upper(), airport_icao.upper().lstrip("K")}
+    m = _ROUTE_RE.search(reason)
+    if m:
+        for code in m.groups():
+            if code and code.upper() not in ap:
+                return _iata_ish(code.upper())
+        return _iata_ish(m.group(1).upper())
+    w = _WAS_RE.search(reason)
+    return _iata_ish(w.group(1).upper()) if w else None
+
+
+def _scheduled_board_events(conn, icao, now):
+    """Upcoming FlightAware rows (scheduled / enroute / departing / diversion)
+    for this airport, shaped like board events and carrying the parsed route
+    code. These are the 'coming into <airport>' rows JetTip shows as PLANNED."""
+    rows = conn.execute(
+        """SELECT * FROM alerts WHERE airport_icao=? AND event_time > ?
+             AND direction IN ('scheduled','enroute','departing','diversion')
+           ORDER BY event_time ASC LIMIT 300""",
+        (icao, now - 3600)).fetchall()
+    out = []
+    for r in rows:
+        ac = ac_mod.classify(ac_mod.get_aircraft(r["icao24"]))
+        out.append({
+            "icao24": r["icao24"],
+            "callsign": r["callsign"],
+            "direction": r["direction"],
+            "event_time": r["event_time"],
+            "registration": ac.get("registration"),
+            "type": ac.get("typecode"),
+            "model": ac.get("model"),
+            "operator": ac.get("operator"),
+            "category": ac.get("category"),
+            "interest_tags": ac.get("interest_tags"),
+            "is_blocked": ac.get("is_blocked"),
+            "display": ac_mod.display_name(ac),
+            "type_art": type_art.resolve(ac.get("typecode"), ac.get("model")),
+            "priority": r["priority"],
+            "reason": r["reason"],
+            "eta_minutes": r["eta_minutes"],
+            "route_code": _route_code_from_reason(r["reason"], icao),
+        })
+    return out
 
 
 # ------------------------------------------------------------------ routes
@@ -185,7 +248,28 @@ def board(icao: str, hours: int = Query(48, ge=1, le=720),
                 continue
             if notable_only and not (e["priority"] or e["is_blocked"]):
                 continue
+            e["route_code"] = None      # live ADS-B rows carry no route
             out.append(e)
+
+        # merge upcoming FlightAware scheduled rows (they carry the route code)
+        now = int(time.time())
+        seen = {(e["icao24"], e["direction"], e["event_time"]) for e in out}
+        for se in _scheduled_board_events(conn, icao, now):
+            key = (se["icao24"], se["direction"], se["event_time"])
+            if key in seen:
+                continue
+            if direction in ("arrival", "departure"):
+                # respect an explicit arrivals/departures filter
+                if direction == "arrival" and se["direction"] == "departing":
+                    continue
+                if direction == "departure" and se["direction"] != "departing":
+                    continue
+            seen.add(key)
+            out.append(se)
+
+    # JetTip-style order: upcoming flights (soonest first) on top, recent past below
+    now = int(time.time())
+    out.sort(key=lambda e: (e["event_time"] <= now, abs(e["event_time"] - now)))
     return {"airport": icao, "hours": hours, "count": len(out), "events": out}
 
 
