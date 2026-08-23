@@ -230,6 +230,56 @@
   .wx .cat{font-weight:700;border-radius:6px;padding:2px 7px;font-size:11px}
   .wx .cat.VFR{background:#eafaf2;color:#0e9f66} .wx .cat.MVFR{background:#eef4ff;color:#2f6fe0}
   .wx .cat.IFR{background:#fdeef0;color:#c81e2a} .wx .cat.LIFR{background:#f3e2f7;color:#8e24aa}
+
+  /* ============ JetTip-style board ============ */
+  .jt-airport{display:flex;align-items:center;gap:14px;background:#c9d3dd;
+    padding:14px 18px 16px;border-radius:14px 14px 0 0;margin:0}
+  .jt-ap-code{font-family:var(--sans);font-weight:800;font-size:30px;color:#16234d;letter-spacing:-.02em;line-height:1}
+  .jt-ap-name{font-family:var(--sans);font-weight:800;font-size:22px;color:#16234d;letter-spacing:-.02em;line-height:1.1;flex:1;min-width:0}
+  .jt-ap-name span{display:block;font-size:12px;font-weight:600;color:#3a4a6b;letter-spacing:.01em;margin-top:2px;text-transform:none}
+  .jt-bell{color:#16234d;font-size:22px;flex-shrink:0}
+  .jt-today{background:#16234d;color:#fff;font-family:var(--sans);font-weight:800;font-size:16px;
+    letter-spacing:.02em;padding:11px 18px;text-transform:uppercase}
+  .jt-list{background:#fff;border:1px solid var(--line);border-top:none;overflow:hidden;
+    box-shadow:var(--shadow)}
+  .jt-foot{background:#16234d;color:#e6ebf5;font-family:var(--sans);font-weight:700;font-size:12px;
+    letter-spacing:.05em;text-align:center;padding:12px;text-transform:uppercase;border-radius:0 0 14px 14px}
+
+  .jt-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;
+    padding:12px 16px;border-bottom:1px solid #e7ebf2;background:#fff;position:relative}
+  .jt-row:last-child{border-bottom:none}
+  .jt-row.jt-blue{background:#dce8fb}
+  .jt-row.jt-peach{background:#fbe2d1}
+  .jt-row.jt-red{background:#fde3e5}
+  /* left: time + arrow + logo */
+  .jt-l{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:64px}
+  .jt-time{font-family:var(--sans);font-weight:800;font-size:19px;color:#16234d;line-height:1;white-space:nowrap}
+  .jt-time .ar{font-size:16px;margin-left:2px;color:#16234d}
+  .jt-logo{width:74px;height:20px;display:flex;align-items:center;font-family:var(--sans);font-weight:800;
+    font-size:11px;color:#3a4a6b;letter-spacing:.02em;text-transform:uppercase;overflow:hidden;white-space:nowrap}
+  /* middle: name + sub + links */
+  .jt-m{min-width:0}
+  .jt-name{font-family:var(--sans);font-weight:800;font-size:20px;color:#16234d;letter-spacing:-.01em;
+    line-height:1.12;text-transform:uppercase}
+  .jt-sub{font-family:var(--sans);font-weight:600;font-size:14px;color:#2c3a55;margin-top:3px}
+  .jt-sub .reg{color:#2f6fe0;font-weight:700}
+  .jt-links{margin-top:5px;display:flex;gap:14px;flex-wrap:wrap}
+  .jt-links a{color:#2f6fe0;font-family:var(--sans);font-weight:700;font-size:12px;text-decoration:none;
+    text-transform:uppercase;letter-spacing:.02em}
+  .jt-links a:hover{text-decoration:underline}
+  .jt-links .tagbtn2{cursor:pointer;color:#c81e2a;font-weight:800;font-size:12px;text-transform:uppercase;user-select:none}
+  .jt-links .tagbtn2.done{color:#0e9f66}
+  /* right: dest code + status */
+  .jt-r{text-align:right;min-width:52px}
+  .jt-code{font-family:var(--sans);font-weight:800;font-size:20px;color:#16234d;line-height:1;
+    border-bottom:2px solid #16234d;display:inline-block;padding-bottom:1px}
+  .jt-code.none{border-bottom:none;color:#9aa6bb}
+  .jt-status{font-family:var(--sans);font-weight:700;font-size:12px;color:#3a4a6b;
+    text-transform:uppercase;letter-spacing:.02em;margin-top:6px}
+  @media(max-width:640px){
+    .jt-name{font-size:18px} .jt-ap-name{font-size:18px} .jt-code{font-size:18px}
+    .jt-l{min-width:54px} .jt-logo{width:54px}
+  }
 </style>
 </head>
 <body>
@@ -323,50 +373,71 @@ const DIRMAP={
   diversion:{t:'⤳ Diverting here',c:'div',pred:1}, cancelled:{t:'✕ Cancelled',c:'div'},
   emergency:{t:'⚠ Emergency',c:'emg',pred:1},
 };
+// ---- JetTip-style row helpers ----
+function jtTime(ts){const d=new Date(ts*1000);let h=d.getHours();const m=d.getMinutes();
+  const ap=h<12?'A':'P';h=h%12||12;return h+':'+String(m).padStart(2,'0')+' '+ap;}
+const _NAMESKIP=new Set(['special-livery','special','retro','heritage','state-livery','livery',
+  'charter','notable','widebody-rare','large-private','oneworld','skyteam','staralliance']);
+function jtName(e){
+  const tags=e.interest_tags||[];
+  let slug=tags.find(t=>t&&!_NAMESKIP.has(t.toLowerCase()));
+  if(slug)return slug.replace(/-/g,' ').toUpperCase();
+  if(['military','gov','warbird','tanker','testbed'].includes(e.category))return String(e.category).toUpperCase();
+  if(tags.some(t=>/retro/i.test(t)))return ((e.operator||e.model||'')+' RETRO').trim().toUpperCase();
+  if(e.operator)return e.operator.toUpperCase();
+  return String(e.model||e.type||e.callsign||e.registration||'AIRCRAFT').toUpperCase();
+}
+function jtTint(e){
+  const d=e.direction||'',tags=(e.interest_tags||[]);
+  if(d==='emergency')return'jt-red';
+  if(e.category==='special'||tags.some(t=>/livery|retro|heritage/i.test(t)))return'jt-blue';
+  if(['scheduled','enroute','inbound','departing','diversion'].includes(d)
+     ||e.category==='charter'||tags.includes('widebody-rare'))return'jt-peach';
+  return'';
+}
+function jtStatus(e){
+  const d=e.direction||'';
+  if(d==='emergency')return'EMERGENCY';
+  if(d==='diversion')return'DIVERTING';
+  if(d==='cancelled')return'CANCELLED';
+  if(['scheduled','enroute','inbound','departing'].includes(d))return'PLANNED';
+  if(d==='departure')return'DEPARTED';
+  if(d==='arrival')return'ARRIVED';
+  return'PLANNED';
+}
 function evRow(e){
   const d=e.direction||'';
-  const predPrio=['scheduled','enroute','inbound','departing','diversion','emergency'].includes(d);
-  const prio=d==='emergency'?'emerg':(predPrio?'inbound':(e.priority||'none'));
-  const parts=(e.display||e.icao24||'').split(' · ');
-  const tail=parts[0]||e.callsign||e.icao24;
-  const typeop=parts.slice(1).join(' · ');
-  const dm=DIRMAP[d]||{t:'✦ '+d,c:'in'};
-  const dir=`<span class="dir ${dm.c}">${dm.t}</span>`;
-  const R=(e.reason||'');
-  // one concise status chip (most relevant), no clutter
-  let chip='';
-  if(d==='emergency')chip='<span class="chip emg">emergency</span>';
-  else if(R.includes('FIRST-EVER'))chip='<span class="chip first">first-ever</span>';
-  else if(d==='diversion'||R.includes('DIVERSION'))chip='<span class="chip div">diversion</span>';
-  else if(d==='cancelled')chip='<span class="chip div">cancelled</span>';
-  else if(d==='departing')chip='<span class="chip dep">departing</span>';
-  else if(d==='enroute')chip='<span class="chip in">enroute</span>';
-  else if(d==='scheduled'||R.includes('SCHEDULED'))chip='<span class="chip in">pre-takeoff</span>';
-  else if(d==='inbound')chip='<span class="chip in">inbound</span>';
-  else if(['military','gov','warbird','tanker','testbed'].includes(e.category))chip='<span class="chip mil">'+e.category+'</span>';
-  else if(e.is_blocked)chip='<span class="chip blocked">notable</span>';
-  else if((e.interest_tags||[]).length)chip='<span class="chip">'+e.interest_tags[0]+'</span>';
-  // right-hand ETA/lead badge for predictive kinds
-  let right='';
-  if(e.eta_minutes!=null&&['enroute','inbound','departing'].includes(d))
-    right=`<div class="eta">${d==='departing'?'T-':'ETA '}${e.eta_minutes}m</div>`;
-  let when;
-  if(d==='scheduled')when='arrives '+fmtTime(e.event_time);
-  else if(d==='departing')when='departs '+fmtTime(e.event_time);
-  else if(d==='enroute'||d==='diversion')when='ETA '+fmtTime(e.event_time);
-  else when=fmtTime(e.event_time);
-  const art=e.type_art?('/static/types/'+e.type_art+'.png'):'';
-  const thumb=art
-    ? `<div class="thumb ph hasart" data-hex="${e.icao24}" data-art="${art}" style="background-image:url('${art}')"></div>`
-    : `<div class="thumb ph" data-hex="${e.icao24}">no<br>photo</div>`;
-  return `<div class="ev ${prio}">
-    ${thumb}
-    <div class="main">
-      <div class="l1"><b>${tail}</b>${chip}<span class="tagbtn" title="Mark as special livery — adds it to your list" onclick="event.stopPropagation();tagLivery('${e.icao24||''}','${(e.registration||'').replace(/'/g,'')}','${(tail||'').replace(/'/g,'')}')">✦ tag</span></div>
-      <div class="sub">${typeop||'&nbsp;'}</div>
-      <div class="fl">${dir} · ${when}${e.callsign&&e.callsign!==tail?(' · '+e.callsign):''}</div>
-      <div class="credit" data-cred="${e.icao24}"></div>
-    </div>${right}</div>`;
+  const arrow=['departure','departing'].includes(d)?'↗':'↘';
+  const name=jtName(e);
+  const type=e.type||'';
+  const reg=e.registration||'';
+  const flight=(e.callsign&&e.callsign!==reg)?e.callsign:'';
+  const sub=[type,reg?`<span class="reg">${reg}</span>`:'',flight].filter(Boolean).join(' · ');
+  // operator/type as the little "logo" text on the left
+  const logo=(e.operator||e.type||'').toString().toUpperCase();
+  // route endpoint (origin for arrivals, destination for departures) — present on
+  // FlightAware scheduled rows; live ADS-B rows don't carry it.
+  const code=(e.origin||e.destination||e.route_code||'').toString().toUpperCase();
+  const codeHtml=code?`<div class="jt-code">${code}</div>`:`<div class="jt-code none">—</div>`;
+  const faIdent=encodeURIComponent(flight||reg||'');
+  const frReg=encodeURIComponent((reg||'').toLowerCase());
+  const links=`<div class="jt-links">`+
+    (faIdent?`<a href="https://flightaware.com/live/flight/${faIdent}" target="_blank" rel="noopener">FlightAware</a>`:'')+
+    (frReg?`<a href="https://www.flightradar24.com/data/aircraft/${frReg}" target="_blank" rel="noopener">FR24</a>`:'')+
+    `<span class="tagbtn2" title="Mark as special livery" onclick="event.stopPropagation();tagLivery('${e.icao24||''}','${(reg||'').replace(/'/g,'')}','${(name||'').replace(/'/g,'')}')">✦ Tag</span>`+
+    `</div>`;
+  return `<div class="jt-row ${jtTint(e)}">
+    <div class="jt-l">
+      <div class="jt-time">${jtTime(e.event_time)}<span class="ar">${arrow}</span></div>
+      <div class="jt-logo">${logo||'&nbsp;'}</div>
+    </div>
+    <div class="jt-m">
+      <div class="jt-name">${name}</div>
+      <div class="jt-sub">${sub||'&nbsp;'}</div>
+      ${links}
+    </div>
+    <div class="jt-r">${codeHtml}<div class="jt-status">${jtStatus(e)}</div></div>
+  </div>`;
 }
 
 // category filter groups — toggle what shows on the board
@@ -406,7 +477,24 @@ async function loadBoard(){
     <div><b style="color:var(--red)">${red}</b><span>high priority</span></div>
     <div><b style="color:var(--blue)">${blue}</b><span>low priority</span></div>
     <div><b style="color:var(--gold)">${blk}</b><span>blocked/notable frames</span></div>`;
-  $("#board").innerHTML=events.length?events.map(evRow).join(""):'<div class="empty">No matching traffic. Try “All traffic”, adjust the filters above, or “Run cycle now”.</div>';
+  // ---- JetTip-style airport header / TODAY band / list / footer ----
+  const sel=$("#airport"), opt=sel.options[sel.selectedIndex];
+  const label=opt?opt.textContent:ap;                 // "KPHX — Phoenix Sky Harbor"
+  const mparts=label.split(/[—-]/);
+  const apCode=(mparts[0]||ap).trim().replace(/^K([A-Z]{3})$/,'$1');
+  const apName=(mparts.slice(1).join('-')||label).trim();
+  const rows=events.length?events.map(evRow).join(""):'<div class="empty" style="border-radius:0;border:none">No matching traffic. Try “All traffic”, adjust the filters above, or “Run cycle now”.</div>';
+  $("#board").innerHTML=`
+   <div class="jt-wrap">
+    <div class="jt-airport">
+      <div class="jt-ap-code">${apCode}</div>
+      <div class="jt-ap-name">${apName}<span>Arrivals &amp; departures · unfiltered</span></div>
+      <div class="jt-bell">🔕</div>
+    </div>
+    <div class="jt-today">Today</div>
+    <div class="jt-list">${rows}</div>
+    <div class="jt-foot">Via FAA · SpotAlert unfiltered feeds</div>
+   </div>`;
   loadWx(); loadFaBudget();
 }
 async function tagLivery(icao24, reg, tail){
