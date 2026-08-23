@@ -1,0 +1,37 @@
+# Render Blueprint — deploy SpotAlert as an always-on web service with a
+# persistent disk for the SQLite database. In Render: New → Blueprint → point
+# at this repo. Set the two OpenSky secrets in the dashboard when prompted.
+services:
+  - type: web
+    name: spotalert
+    runtime: python
+    plan: starter            # always-on; the Free plan sleeps and would stop the scheduler
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/airports
+    disk:
+      name: spotalert-data
+      mountPath: /var/data    # SQLite lives here so it survives deploys/restarts
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: JETTIP_DB
+        value: /var/data/jettip.db
+      - key: SCHEDULER_ENABLED
+        value: "1"
+      - key: SCHEDULER_INTERVAL_SEC
+        value: "300"
+      - key: VAPID_SUBJECT
+        value: mailto:you@example.com
+      # Set these as secrets in the Render dashboard (Environment tab):
+      - key: OPENSKY_CLIENT_ID
+        sync: false
+      - key: OPENSKY_CLIENT_SECRET
+        sync: false
+      # Optional web push — generate once and paste in the dashboard:
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false

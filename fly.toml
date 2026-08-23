@@ -1,0 +1,36 @@
+# Fly.io config for SpotAlert — cheapest always-on option (~$3.30/mo instance
+# + ~$0.15/mo for a 1 GB volume). Deploy with the flyctl steps in DEPLOY_FLY.md.
+#
+# NOTE: `app` names are GLOBAL on Fly — if "spotalert" is taken, `fly launch`
+# will ask you to pick another; just accept a unique one.
+app = "spotalert"
+primary_region = "lax"          # Los Angeles — closest common Fly region to Phoenix
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  JETTIP_DB = "/var/data/jettip.db"
+  SCHEDULER_ENABLED = "1"
+  SCHEDULER_INTERVAL_SEC = "300"
+  VAPID_SUBJECT = "mailto:you@example.com"
+
+# Persistent volume so the SQLite database survives restarts/deploys.
+[mounts]
+  source = "spotalert_data"
+  destination = "/var/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # KEEP IT ALWAYS-ON: do NOT let Fly stop the machine, or the background
+  # scheduler stops and alerts stop. This is the Fly equivalent of avoiding
+  # Render's sleeping free tier.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

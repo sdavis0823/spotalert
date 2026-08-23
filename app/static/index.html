@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SpotAlert — unusual aircraft alerts</title>
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#0a1017">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SpotAlert">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@600;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#070b11; --glass:rgba(22,32,47,.55); --glass2:rgba(28,40,58,.62);
+    --line:rgba(255,255,255,.075); --line2:rgba(255,255,255,.12);
+    --ink:#eaf1fb; --dim:#9fb2cc; --faint:#6b809c;
+    --blue:#5bb0ff; --blue2:#7bc4ff; --panel:var(--glass); --panel2:var(--glass2);
+    --red:#ff6b70; --gold:#ffd166; --green:#4fe0a6; --purple:#b39dff; --orange:#ff9d4a;
+    --chip:rgba(255,255,255,.05);
+    --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -12px rgba(0,0,0,.7);
+    --glow:0 0 0 1px rgba(91,176,255,.12),0 8px 40px -8px rgba(91,176,255,.25);
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    --disp:"Chivo",var(--sans);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.55 var(--sans);background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:-20% -10%;z-index:-1;pointer-events:none;
+    background:radial-gradient(46% 40% at 78% 6%,rgba(91,176,255,.20),transparent 60%),
+      radial-gradient(40% 38% at 8% 96%,rgba(179,157,255,.16),transparent 58%),
+      linear-gradient(180deg,#070b11,#060a10);animation:drift 26s ease-in-out infinite alternate}
+  @keyframes drift{to{transform:translate3d(0,-2%,0) scale(1.04)}}
+  @media(prefers-reduced-motion:reduce){body::before,.pill .dot,.eta.live{animation:none}}
+  header{padding:18px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5;
+    flex-wrap:wrap;background:rgba(7,11,17,.6);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--line)}
+  header h1{font-family:var(--disp);font-weight:900;font-size:21px;letter-spacing:-.02em;margin:0;
+    background:linear-gradient(180deg,#fff,#bcd4f0);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header .tag{color:var(--dim);font-size:13px;flex:1;min-width:160px}
+  .pill{font:500 12px/1 var(--mono);padding:7px 12px;border-radius:999px;border:1px solid var(--line2);
+    background:var(--glass);backdrop-filter:blur(12px);color:var(--dim);white-space:nowrap;box-shadow:var(--shadow)}
+  .pill.on{color:var(--green);border-color:rgba(79,224,166,.3);background:rgba(79,224,166,.08)}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 24px 64px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  select,button,input{background:var(--glass2);color:var(--ink);border:1px solid var(--line);border-radius:11px;
+    padding:9px 12px;font-size:14px;font-family:var(--sans);backdrop-filter:blur(8px);transition:border-color .2s}
+  select:hover,input:hover{border-color:var(--line2)}
+  select:focus,button:focus-visible,input:focus{outline:2px solid var(--blue);outline-offset:1px}
+  button{cursor:pointer}
+  button.primary{background:linear-gradient(180deg,var(--blue2),var(--blue));border-color:transparent;
+    color:#04121f;font-weight:600;box-shadow:0 6px 20px -8px rgba(91,176,255,.7)}
+  button.primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  button:hover{border-color:var(--line2)} button.sm{padding:6px 10px;font-size:12px}
+  .grid{display:grid;grid-template-columns:1fr;gap:11px}
+  .card{background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .ev{display:flex;align-items:center;gap:13px;padding:13px 16px;border-radius:14px;background:var(--glass);
+    border:1px solid var(--line);position:relative;overflow:hidden;backdrop-filter:blur(14px);
+    transition:transform .2s,border-color .2s,background .2s}
+  .ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line2)}
+  .ev:hover{transform:translateY(-1px);border-color:var(--line2);background:var(--glass2)}
+  .ev.red::before{background:linear-gradient(180deg,var(--red),#c0343a)}
+  .ev.blue::before{background:linear-gradient(180deg,var(--blue2),var(--blue))}
+  .ev.inbound::before{background:linear-gradient(180deg,var(--purple),#7b6bd6)}
+  .ev.inbound{background:linear-gradient(90deg,rgba(179,157,255,.08),var(--glass) 45%)}
+  .ev .prio{width:72px;font:600 11px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em;padding-left:4px}
+  .ev.red .prio{color:var(--red)} .ev.blue .prio{color:var(--blue2)} .ev.inbound .prio{color:var(--purple)}
+  .ev .prio.none{color:var(--faint);font-weight:500}
+  .ev .main{flex:1;min-width:0} .ev .main b{font-size:14.5px;letter-spacing:-.005em}
+  .ev .sub{color:var(--dim);font-size:12.5px;margin-top:3px;font-family:var(--mono)}
+  .ev .time{color:var(--faint);font-size:12px;text-align:right;white-space:nowrap;font-family:var(--mono)}
+  .eta{font-family:var(--mono);font-weight:600;color:var(--purple);font-size:16px;white-space:nowrap;
+    font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .eta.live{animation:etaGlow 1.6s ease-in-out infinite}
+  @keyframes etaGlow{50%{text-shadow:0 0 16px rgba(179,157,255,.7)}}
+  .chip{display:inline-flex;background:var(--chip);border:1px solid var(--line);color:var(--dim);
+    border-radius:999px;padding:2px 10px;font-size:11px;margin-left:6px;font-family:var(--mono);white-space:nowrap}
+  .chip.mil{color:#ff9ea2;border-color:rgba(255,107,112,.32);background:rgba(255,107,112,.1)}
+  .chip.blocked{color:var(--gold);border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.09)}
+  .chip.first{color:var(--green);border-color:rgba(79,224,166,.32);background:rgba(79,224,166,.1)}
+  .chip.in{color:var(--purple);border-color:rgba(179,157,255,.3);background:rgba(179,157,255,.08)}
+  .chip.div{color:var(--orange);border-color:rgba(255,157,74,.32);background:rgba(255,157,74,.1)}
+  .dir{font-size:11px;color:var(--dim);font-family:var(--mono)}
+  .dir.arr{color:var(--green)} .dir.dep{color:var(--gold)} .dir.in{color:var(--purple)}
+  .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;padding:5px;border-radius:14px;
+    background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);box-shadow:var(--shadow)}
+  .tabs button{background:transparent;border:none;color:var(--dim);padding:9px 14px;border-radius:10px;
+    font-family:var(--disp);font-weight:600;font-size:13.5px;transition:all .2s}
+  .tabs button:hover{color:var(--ink);background:rgba(255,255,255,.04)}
+  .tabs button.active{color:#eaf3ff;background:linear-gradient(180deg,rgba(91,176,255,.22),rgba(91,176,255,.08));
+    box-shadow:inset 0 0 0 1px rgba(91,176,255,.25)}
+  .muted{color:var(--dim)} .empty{color:var(--dim);padding:28px;text-align:center}
+  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
+  .stat div{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:12px 16px;
+    backdrop-filter:blur(16px);box-shadow:var(--shadow)}
+  .stat div b{font-family:var(--mono);font-size:24px;display:block;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+  .stat div span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  label.f{display:block;margin:12px 0 4px;color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  .row2{display:flex;gap:20px;flex-wrap:wrap} .rowi{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  .cats{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .cats label{display:flex;gap:6px;align-items:center;background:var(--glass2);border:1px solid var(--line);
+    border-radius:10px;padding:6px 10px;font-size:13px;cursor:pointer}
+  .badge{font-size:11px;padding:2px 9px;border-radius:7px;margin-left:6px;font-family:var(--mono)}
+  .badge.sent{background:rgba(79,224,166,.12);color:var(--green)}
+  .badge.dry-run{background:rgba(255,209,102,.12);color:var(--gold)}
+  .badge.failed{background:rgba(255,107,112,.12);color:#ff9ea2}
+  input[type=text],input[type=email],input[type=number]{width:100%}
+  h3{margin:0 0 4px;font-family:var(--disp);font-weight:700;letter-spacing:-.01em}
+  .thumb{width:88px;height:58px;border-radius:11px;object-fit:cover;background:var(--glass2);
+    border:1px solid var(--line);flex-shrink:0;display:block}
+  .thumb.ph{display:grid;place-items:center;color:var(--dim);font-size:10px;text-align:center;line-height:1.2;font-family:var(--mono)}
+  .credit{font-size:10px;color:var(--faint);margin-top:3px;font-family:var(--mono)}
+  .credit a{color:var(--dim)}
+  .legend{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:0 0 16px;padding:13px 16px;
+    border-radius:14px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);
+    box-shadow:var(--shadow);font-size:12.5px;color:var(--dim)}
+  .legend .lgt{font-family:var(--disp);font-weight:700;color:var(--ink);font-size:13px;margin-right:4px}
+  .legend .lg{display:inline-flex;align-items:center;gap:7px} .legend .lg b{color:var(--ink);font-weight:600}
+  .legend .d{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .legend .d.red{background:var(--red)} .legend .d.blue{background:var(--blue2)}
+  .legend .d.violet{background:var(--purple)} .legend .d.amber{background:var(--gold)}
+  @media(max-width:640px){
+    .ev{flex-wrap:wrap;gap:10px 12px} .ev .prio{width:auto;order:1}
+    .ev .thumb{order:2} .ev .main{order:4;flex-basis:100%} .ev .time,.ev .eta{order:3;margin-left:auto}
+    .tabs{overflow-x:auto;flex-wrap:nowrap} .tabs button{white-space:nowrap}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>✈︎ SpotAlert</h1>
+  <span class="tag">unusual-aircraft alerts · unfiltered feeds · predictive ETA · watchlists · logbook</span>
+  <span class="pill" id="sched">scheduler…</span>
+</header>
+<div class="wrap">
+  <div class="controls" id="boardControls">
+    <label class="muted">Airport</label><select id="airport"></select>
+    <label class="muted">Window</label>
+    <select id="hours"><option value="48">48h</option><option value="168">7d</option><option value="720" selected>30d</option></select>
+    <label class="muted">Show</label>
+    <select id="filter"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
+    <button class="primary" id="refresh">↻ Run cycle now</button>
+  </div>
+
+  <div class="stat" id="stat"></div>
+
+  <div class="legend" id="legend">
+    <span class="lgt">What the colors mean</span>
+    <span class="lg"><i class="d red"></i><b>Red</b> rare or notable — seen 2× or less here in 30 days, or an inherently special aircraft</span>
+    <span class="lg"><i class="d blue"></i><b>Blue</b> uncommon — its 3rd or 4th visit in 30 days</span>
+    <span class="lg"><i class="d violet"></i><b>Inbound</b> heading your way now, with a live countdown</span>
+    <span class="lg"><i class="d amber"></i><b>Blocked</b> military / private jets JetTip hides — we show them</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="board" class="active">Flight board</button>
+    <button data-tab="inbound">Inbound ✦</button>
+    <button data-tab="alerts">Alert feed</button>
+    <button data-tab="notif">Notifications</button>
+    <button data-tab="watch">Watchlists</button>
+    <button data-tab="log">Logbook</button>
+    <button data-tab="settings">Settings</button>
+  </div>
+
+  <div id="board" class="grid"></div>
+  <div id="inbound" style="display:none"></div>
+  <div id="alerts" class="grid" style="display:none"></div>
+  <div id="notif" class="grid" style="display:none"></div>
+  <div id="watch" style="display:none"></div>
+  <div id="log" style="display:none"></div>
+  <div id="settings" style="display:none"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+let AIRPORTS=[],TAB="board";
+const EMAIL="spotter@example.com";
+const CATS=["special","warbird","tanker","testbed","military","gov","private","cargo","airliner"];
+async function j(u,o){const r=await fetch(u,o);return r.json();}
+function fmtTime(ts){return new Date(ts*1000).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
+
+function evRow(e){
+  const prio=e.direction==='inbound'?'inbound':(e.priority||'none');
+  const label=e.direction==='inbound'?'inbound':(e.priority||'—');
+  const dir=e.direction==='arrival'?'<span class="dir arr">▼ arr</span>'
+    :e.direction==='departure'?'<span class="dir dep">▲ dep</span>'
+    :'<span class="dir in">✦ inbound</span>';
+  const chips=[];
+  if((e.reason||"").includes("FIRST-EVER"))chips.push('<span class="chip first">first-ever</span>');
+  if((e.reason||"").includes("DIVERSION"))chips.push('<span class="chip div">diversion</span>');
+  if(e.direction==='inbound')chips.push('<span class="chip in">predictive</span>');
+  if(e.is_blocked)chips.push('<span class="chip blocked">blocked/notable</span>');
+  if(["military","gov","warbird","tanker","testbed"].includes(e.category))chips.push('<span class="chip mil">'+e.category+'</span>');
+  (e.interest_tags||[]).forEach(t=>chips.push('<span class="chip">'+t+'</span>'));
+  const right=e.direction==='inbound'&&e.eta_minutes!=null
+    ?`<div class="eta">ETA ~${e.eta_minutes}m</div>`:`<div class="time">${fmtTime(e.event_time)}</div>`;
+  return `<div class="ev ${prio}"><div class="prio ${prio==='none'?'none':''}">${label}</div>
+    <div class="thumb ph" data-hex="${e.icao24}">loading<br>photo…</div>
+    <div class="main"><b>${e.display||e.icao24}</b> ${chips.join("")}
+      <div class="sub">${dir} ${e.callsign?('· '+e.callsign):''} ${e.reason?('· '+e.reason):''}</div>
+      <div class="credit" data-cred="${e.icao24}"></div></div>
+    ${right}</div>`;
+}
+
+async function loadBoard(){
+  const ap=$("#airport").value,hours=$("#hours").value,notable=$("#filter").value==="notable";
+  const data=await j(`/api/board/${ap}?hours=${hours}&notable_only=${notable}`);
+  const red=data.events.filter(e=>e.priority==='red').length,blue=data.events.filter(e=>e.priority==='blue').length,blk=data.events.filter(e=>e.is_blocked).length;
+  $("#stat").innerHTML=`<div><b>${data.count}</b><span>events shown</span></div>
+    <div><b style="color:var(--red)">${red}</b><span>high priority</span></div>
+    <div><b style="color:var(--blue)">${blue}</b><span>low priority</span></div>
+    <div><b style="color:var(--gold)">${blk}</b><span>blocked/notable frames</span></div>`;
+  $("#board").innerHTML=data.events.length?data.events.map(evRow).join(""):'<div class="empty">No matching traffic. Try “All traffic” or “Run cycle now”.</div>';
+}
+async function loadAlerts(){
+  const data=await j(`/api/alerts?airport=${$("#airport").value}&limit=200`);
+  $("#alerts").innerHTML=data.alerts.length?data.alerts.map(evRow).join(""):'<div class="empty">No alerts yet.</div>';
+}
+async function loadInbound(){
+  const all=await j(`/api/alerts?limit=400`);
+  const inb=all.alerts.filter(a=>a.direction==='inbound').sort((a,b)=>(a.eta_minutes||999)-(b.eta_minutes||999));
+  $("#inbound").innerHTML=`
+   <div class="card">
+     <h3>✦ Predictive inbound ETA <span class="muted" style="font-weight:400">— know before it lands (JetTip can't)</span></h3>
+     <p class="muted" style="margin:6px 0 10px">Live positions → notable aircraft heading your way, with a countdown. Try it: inject a synthetic inbound and watch the alert appear.</p>
+     <div class="rowi">
+       <div><label class="f">Airport</label><select id="sim_ap">${AIRPORTS.map(a=>`<option value="${a.icao}">${a.icao}</option>`).join("")}</select></div>
+       <div><label class="f">Aircraft (hex)</label>
+         <select id="sim_ac">
+           <option value="a3d001">A380 · Emirates</option>
+           <option value="a4e001">P-51 Mustang</option>
+           <option value="adfe01">VC-25 (Air Force One)</option>
+           <option value="a6a001">G650 (blocked)</option>
+           <option value="a7b001">747 GE testbed</option>
+         </select></div>
+       <div><label class="f">Dist (nm)</label><input type="number" id="sim_d" value="60" style="width:90px"></div>
+       <div><label class="f">Speed (kt)</label><input type="number" id="sim_gs" value="440" style="width:90px"></div>
+       <button class="primary" id="sim_go">Inject inbound</button>
+     </div>
+     <div id="sim_msg" class="muted" style="margin-top:10px"></div>
+   </div>
+   <div class="grid" id="inb_list">${inb.length?inb.map(evRow).join(""):'<div class="empty">No inbound aircraft right now. Inject one above to test the countdown.</div>'}</div>`;
+  $("#sim_go").onclick=async()=>{
+    const body={airport:$("#sim_ap").value,icao24:$("#sim_ac").value,dist_nm:+$("#sim_d").value,gs:+$("#sim_gs").value};
+    const r=await j("/api/eta/simulate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const c=(r.result&&r.result.detail&&r.result.detail[0]);
+    $("#sim_msg").textContent=c?`Detected inbound: ETA ~${c.eta_min} min (${c.dist_nm} nm, ${c.gs} kt). Dispatched: dry-run ${r.dispatch.dry_run}, watchlist hits ${r.dispatch.watchlist_hits}.`:"No inbound detected (try heading straight in / closer / notable aircraft).";
+    loadInbound().then(loadPhotos);
+  };
+}
+async function loadNotif(){
+  const data=await j(`/api/notifications?limit=200`);
+  $("#notif").innerHTML=data.notifications.length?data.notifications.map(n=>`
+    <div class="ev ${n.eta_minutes!=null?'inbound':n.priority}">
+      <div class="prio">${n.eta_minutes!=null?'inbound':n.priority}</div>
+      <div class="main"><b>${n.display}</b>
+        <span class="badge ${n.status}">${n.channel} · ${n.status}</span>
+        <span class="chip">${n.source||'subscription'}</span>
+        <div class="sub">→ ${n.email} · ${n.airport_icao} · ${n.reason||''} · ${n.detail||''}</div></div>
+      <div class="time">${fmtTime(n.sent_at)}</div></div>`).join(""):
+    '<div class="empty">No notifications yet. Add a subscription (Settings) or watchlist, then “Run cycle now”.</div>';
+}
+async function loadWatch(){
+  const d=await j(`/api/watchlists/${encodeURIComponent(EMAIL)}`);
+  const rows=d.watchlists.map(w=>`<div class="ev">
+     <div class="main"><b>${w.match_type}: ${w.value}</b> <span class="chip">${w.region}</span>
+       <div class="sub">${w.label||''}</div></div>
+     <button class="sm" onclick="delWatch(${w.id})">remove</button></div>`).join("");
+  $("#watch").innerHTML=`
+   <div class="card"><h3>Watchlists <span class="muted" style="font-weight:400">— follow a tail, type, or category across a region</span></h3>
+     <p class="muted" style="margin:6px 0 10px">“Alert me on ANY A380 in the Pacific NW”, or a single tail anywhere. A long-standing spotter request JetTip's airport-only model can't do.</p>
+     <div class="rowi">
+       <div><label class="f">Match</label><select id="w_type"><option value="type">Type code</option><option value="tail">Tail #</option><option value="category">Category</option></select></div>
+       <div style="flex:1;min-width:160px"><label class="f">Value (e.g. A388, N1KE, warbird)</label><input type="text" id="w_val" placeholder="A388"></div>
+       <div style="flex:1;min-width:160px"><label class="f">Region (‘any’ or ICAOs)</label><input type="text" id="w_region" value="any"></div>
+       <button class="primary" id="w_add">Add</button>
+     </div><div id="w_msg" class="muted" style="margin-top:8px"></div>
+   </div>
+   <div class="grid">${rows||'<div class="empty">No watchlists yet.</div>'}</div>`;
+  $("#w_add").onclick=async()=>{
+    const body={email:EMAIL,match_type:$("#w_type").value,value:$("#w_val").value,region:$("#w_region").value||"any"};
+    if(!body.value){$("#w_msg").textContent="Enter a value.";return;}
+    const r=await j("/api/watchlists",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    $("#w_msg").textContent=r.ok?"Added.":"Error.";loadWatch();
+  };
+}
+async function delWatch(id){await fetch(`/api/watchlists/${encodeURIComponent(EMAIL)}/${id}`,{method:"DELETE"});loadWatch();}
+async function loadLog(){
+  const d=await j(`/api/logbook/${encodeURIComponent(EMAIL)}`);const s=d.stats;
+  const rows=d.entries.map(e=>`<div class="ev">
+     <div class="main"><b>${e.registration||e.icao24||'?'} · ${e.typecode||''}</b> <span class="chip">${e.airport_icao||''}</span>
+       <div class="sub">${e.notes||''} · ${fmtTime(e.seen_at)}</div></div>
+     <button class="sm" onclick="delLog(${e.id})">remove</button></div>`).join("");
+  $("#log").innerHTML=`
+   <div class="card"><h3>Spotting logbook <span class="muted" style="font-weight:400">— log what you caught</span></h3>
+     <div class="stat" style="margin:10px 0">
+       <div><b>${s.total}</b><span>logged</span></div>
+       <div><b>${s.unique_tails}</b><span>unique tails</span></div>
+       <div><b>${s.unique_types}</b><span>unique types</span></div>
+       <div><b>${s.unique_airports}</b><span>airports</span></div></div>
+     <div class="rowi">
+       <div><label class="f">Aircraft hex</label><input type="text" id="l_hex" placeholder="a4e001"></div>
+       <div><label class="f">Airport</label><select id="l_ap">${AIRPORTS.map(a=>`<option>${a.icao}</option>`).join("")}</select></div>
+       <div style="flex:1;min-width:180px"><label class="f">Notes</label><input type="text" id="l_notes" placeholder="Golden hour catch"></div>
+       <button class="primary" id="l_add">Log it</button>
+     </div><div id="l_msg" class="muted" style="margin-top:8px">Types caught: ${s.types.join(", ")||'—'}</div>
+   </div>
+   <div class="grid">${rows||'<div class="empty">Nothing logged yet.</div>'}</div>`;
+  $("#l_add").onclick=async()=>{
+    const body={email:EMAIL,icao24:$("#l_hex").value.trim().toLowerCase(),airport_icao:$("#l_ap").value,notes:$("#l_notes").value};
+    if(!body.icao24){$("#l_msg").textContent="Enter an aircraft hex (e.g. a4e001).";return;}
+    const r=await j("/api/logbook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    $("#l_msg").textContent=r.ok?"Logged.":"Error.";loadLog();
+  };
+}
+async function delLog(id){await fetch(`/api/logbook/${encodeURIComponent(EMAIL)}/${id}`,{method:"DELETE"});loadLog();}
+async function loadSettings(){
+  const cats=CATS.map(c=>`<label><input type="checkbox" value="${c}" class="catbox">${c}</label>`).join("");
+  const apts=AIRPORTS.map(a=>`<option value="${a.icao}">${a.icao} — ${a.name}</option>`).join("");
+  $("#settings").innerHTML=`<div class="card"><h3>Alert subscription</h3>
+    <p class="muted" style="margin:4px 0 8px">Pushed the moment a notable frame is detected. Email runs <b>dry-run</b> (rendered + logged) until SMTP is set — no real mail sent.</p>
+    <label class="f">Email</label><input type="email" id="s_email" value="${EMAIL}">
+    <label class="f">Airports (⌘/Ctrl-click up to 10)</label><select id="s_airports" multiple size="6" style="width:100%">${apts}</select>
+    <div class="row2"><div><label class="f">Priorities</label>
+      <label><input type="checkbox" id="s_red" checked> High (red)</label>
+      <label><input type="checkbox" id="s_blue" checked> Low (blue)</label></div>
+      <div><label class="f">Channels</label><label><input type="checkbox" id="s_email_ch" checked> Email</label></div></div>
+    <label class="f">Slack/Discord/custom webhook URL (optional)</label><input type="text" id="s_webhook" placeholder="https://hooks.slack.com/...">
+    <label class="f">Restrict to categories (optional — none = everything)</label><div class="cats">${cats}</div>
+    <div style="margin-top:14px;display:flex;gap:10px"><button class="primary" id="s_save">Save</button><button id="s_test">Save & run cycle</button></div>
+    <div id="s_msg" class="muted" style="margin-top:10px"></div></div>
+    <div class="card"><h3>Push to this device</h3>
+      <p class="muted" style="margin:4px 0 8px">Get alerts on your phone / desktop even when this tab is closed (Web Push). Needs HTTPS or localhost.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="primary" id="p_enable">Enable push</button>
+        <button id="p_test">Send test push</button></div>
+      <div id="p_msg" class="muted" style="margin-top:10px"></div></div>`;
+  $("#s_save").onclick=()=>saveSub(false);$("#s_test").onclick=()=>saveSub(true);
+  $("#p_enable").onclick=enablePush;$("#p_test").onclick=testPush;
+  pushStatus();
+  const cur=await j(`/api/subscriptions/${encodeURIComponent($("#s_email").value)}`).catch(()=>null);
+  if(cur&&cur.airports){[...$("#s_airports").options].forEach(o=>o.selected=cur.airports.includes(o.value));
+    $("#s_red").checked=!!cur.want_red;$("#s_blue").checked=!!cur.want_blue;$("#s_email_ch").checked=!!cur.want_email;
+    $("#s_webhook").value=cur.webhook_url||"";document.querySelectorAll(".catbox").forEach(cb=>cb.checked=(cur.categories||[]).includes(cb.value));}
+}
+async function saveSub(run){
+  const airports=[...$("#s_airports").selectedOptions].map(o=>o.value);
+  const categories=[...document.querySelectorAll(".catbox:checked")].map(c=>c.value);
+  const body={email:$("#s_email").value,airports,want_red:$("#s_red").checked,want_blue:$("#s_blue").checked,
+    want_email:$("#s_email_ch").checked,webhook_url:$("#s_webhook").value,categories};
+  const r=await j("/api/subscriptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  let msg=r.ok?`Saved — watching ${r.airports.join(", ")||"(none)"}.`:`Error: ${r.detail||JSON.stringify(r)}`;
+  if(run&&r.ok){const d=await j("/api/refresh?hours=6",{method:"POST"});msg+=` Cycle: dry-run ${d.dispatch?.dry_run||0}, watchlist ${d.dispatch?.watchlist_hits||0}.`;}
+  $("#s_msg").textContent=msg;loadScheduler();
+}
+function b64ToU8(base64){
+  const pad="=".repeat((4-base64.length%4)%4);
+  const b=(base64+pad).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(b);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+async function pushStatus(){
+  const m=$("#p_msg");if(!m)return;
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)){m.textContent="This browser doesn't support web push.";return;}
+  try{const s=await j("/api/push/vapid-public-key");
+    m.textContent=s.can_send?`Ready. VAPID ${s.ephemeral?"(ephemeral dev key)":"configured"}.`
+      :`Server can store subscriptions; ${s.note}`;}catch(e){m.textContent="";}
+}
+async function enablePush(){
+  const m=$("#p_msg");
+  try{
+    if(!("serviceWorker" in navigator)){m.textContent="No service worker support.";return;}
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){m.textContent="Permission denied — enable notifications for this site.";return;}
+    const reg=await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const key=await j("/api/push/vapid-public-key");
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(key.publicKey)});
+    const r=await j("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:EMAIL,subscription:sub.toJSON()})});
+    m.className="msg ok";m.textContent=`Push enabled on this device (${r.devices} registered).`;
+  }catch(e){m.textContent="Couldn't enable push: "+e.message;}
+}
+async function testPush(){
+  const r=await j(`/api/push/test/${encodeURIComponent(EMAIL)}`,{method:"POST"});
+  $("#p_msg").textContent=`Test push: ${r.status} — ${r.detail}`;
+}
+async function loadScheduler(){
+  const s=await j("/api/scheduler");const el=$("#sched");
+  if(s.enabled){el.className="pill on";el.textContent=`● scheduler on · every ${s.interval_sec}s · ${s.runs} runs`;}
+  else{el.className="pill";el.textContent="scheduler off";}
+}
+const PHOTOS={};
+async function loadPhotos(){
+  const nodes=[...document.querySelectorAll('.thumb.ph[data-hex]')];
+  for(const n of nodes){
+    const hex=n.dataset.hex; if(!hex) continue;
+    n.removeAttribute('data-hex'); // claim it
+    let p=PHOTOS[hex];
+    if(p===undefined){ try{p=await j(`/api/photo/${hex}`);}catch(e){p={};} PHOTOS[hex]=p; }
+    if(p&&p.thumbnail){
+      const img=new Image(); img.className="thumb"; img.src=p.thumbnail; img.alt="aircraft photo"; img.loading="lazy";
+      img.onclick=()=>window.open(p.link,"_blank");
+      img.style.cursor="pointer"; n.replaceWith(img);
+      const cred=document.querySelector(`.credit[data-cred="${hex}"]`);
+      if(cred&&p.photographer) cred.innerHTML=`photo © ${p.photographer} · <a href="${p.link}" target="_blank">${p.credit||'source'}</a>`;
+    } else {
+      n.classList.remove('ph'); n.classList.add('ph'); n.innerHTML="no<br>photo";
+    }
+  }
+}
+const LOADERS={board:loadBoard,inbound:loadInbound,alerts:loadAlerts,notif:loadNotif,watch:loadWatch,log:loadLog,settings:loadSettings};
+function switchTab(t){
+  TAB=t;
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
+  ["board","inbound","alerts","notif","watch","log","settings"].forEach(id=>{
+    const grid=(id==="board"||id==="alerts"||id==="notif");
+    $("#"+id).style.display=(id===t)?(grid?"grid":"block"):"none";});
+  $("#boardControls").style.display=(t==="board")?"flex":"none";
+  $("#stat").style.display=(t==="board")?"flex":"none";
+  Promise.resolve(LOADERS[t]()).then(loadPhotos);
+}
+async function init(){
+  AIRPORTS=await j("/api/airports");
+  $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}">${a.icao} — ${a.name}</option>`).join("");
+  document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  ["airport","hours","filter"].forEach(id=>$("#"+id).onchange=()=>{if(TAB==="board")loadBoard().then(loadPhotos);});
+  $("#refresh").onclick=async()=>{
+    $("#refresh").textContent="Running…";$("#refresh").disabled=true;
+    const r=await j("/api/refresh?hours=6",{method:"POST"});
+    $("#refresh").textContent="↻ Run cycle now";$("#refresh").disabled=false;
+    const d=r.dispatch||{};
+    alert(`Sources: ${(r.sources||[]).join(", ")}\nNew visits: ${r.new_visits} · alerts: ${r.new_alerts}\nInbound found: ${(r.inbound&&r.inbound.new_alerts)||0}\nNotify — dry-run:${d.dry_run||0} sent:${d.sent||0} watchlist:${d.watchlist_hits||0}`+(r.note?`\n\n${r.note}`:""));
+    switchTab(TAB);loadScheduler();
+  };
+  loadScheduler();setInterval(loadScheduler,15000);
+  switchTab("board");
+  // register the service worker so SpotAlert is installable as an app (PWA)
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
+}
+init();
+</script>
+</body>
+</html>
