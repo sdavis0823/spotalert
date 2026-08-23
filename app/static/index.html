@@ -4,142 +4,241 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>SpotAlert — unusual aircraft alerts</title>
+<link rel="icon" type="image/png" href="/static/icon-192.png">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SpotAlert">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@600;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
-    --bg:#070b11; --glass:rgba(22,32,47,.55); --glass2:rgba(28,40,58,.62);
-    --line:rgba(255,255,255,.075); --line2:rgba(255,255,255,.12);
-    --ink:#eaf1fb; --dim:#9fb2cc; --faint:#6b809c;
-    --blue:#5bb0ff; --blue2:#7bc4ff; --panel:var(--glass); --panel2:var(--glass2);
-    --red:#ff6b70; --gold:#ffd166; --green:#4fe0a6; --purple:#b39dff; --orange:#ff9d4a;
-    --chip:rgba(255,255,255,.05);
-    --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -12px rgba(0,0,0,.7);
-    --glow:0 0 0 1px rgba(91,176,255,.12),0 8px 40px -8px rgba(91,176,255,.25);
-    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --bg:#eef1f6; --surface:#ffffff; --surface2:#f4f6fa; --raise:#ffffff;
+    --line:#e4e8ef; --line2:#d3dae4;
+    --ink:#131f38; --ink2:#2c3a55; --dim:#6a7688; --faint:#94a0b2;
+    --brand:#e8202a; --brand-2:#ff3b45;      /* logo red */
+    --sky:#2f8fe0; --sky-2:#1f7acd;           /* logo blue */
+    --red:#e8202a; --blue:#2f8fe0; --violet:#7c5cff; --gold:#e8a30b; --green:#17b877; --orange:#f2792b;
+    --shadow:0 1px 2px rgba(20,35,65,.06), 0 4px 16px -6px rgba(20,35,65,.10);
+    --shadow-lg:0 8px 30px -10px rgba(20,35,65,.18);
+    --sans:"Manrope",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --disp:var(--sans);
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-    --disp:"Chivo",var(--sans);
   }
   *{box-sizing:border-box}
-  body{margin:0;font:15px/1.55 var(--sans);background:var(--bg);color:var(--ink);
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;
     -webkit-font-smoothing:antialiased;overflow-x:hidden}
-  body::before{content:"";position:fixed;inset:-20% -10%;z-index:-1;pointer-events:none;
-    background:radial-gradient(46% 40% at 78% 6%,rgba(91,176,255,.20),transparent 60%),
-      radial-gradient(40% 38% at 8% 96%,rgba(179,157,255,.16),transparent 58%),
-      linear-gradient(180deg,#070b11,#060a10);animation:drift 26s ease-in-out infinite alternate}
-  @keyframes drift{to{transform:translate3d(0,-2%,0) scale(1.04)}}
-  @media(prefers-reduced-motion:reduce){body::before,.pill .dot,.eta.live{animation:none}}
-  header{padding:18px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5;
-    flex-wrap:wrap;background:rgba(7,11,17,.6);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-    border-bottom:1px solid var(--line)}
-  header h1{font-family:var(--disp);font-weight:900;font-size:21px;letter-spacing:-.02em;margin:0;
-    background:linear-gradient(180deg,#fff,#bcd4f0);-webkit-background-clip:text;background-clip:text;color:transparent}
-  header .tag{color:var(--dim);font-size:13px;flex:1;min-width:160px}
-  .pill{font:500 12px/1 var(--mono);padding:7px 12px;border-radius:999px;border:1px solid var(--line2);
-    background:var(--glass);backdrop-filter:blur(12px);color:var(--dim);white-space:nowrap;box-shadow:var(--shadow)}
-  .pill.on{color:var(--green);border-color:rgba(79,224,166,.3);background:rgba(79,224,166,.08)}
-  .wrap{max-width:1080px;margin:0 auto;padding:22px 24px 64px}
-  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
-  select,button,input{background:var(--glass2);color:var(--ink);border:1px solid var(--line);border-radius:11px;
-    padding:9px 12px;font-size:14px;font-family:var(--sans);backdrop-filter:blur(8px);transition:border-color .2s}
-  select:hover,input:hover{border-color:var(--line2)}
-  select:focus,button:focus-visible,input:focus{outline:2px solid var(--blue);outline-offset:1px}
-  button{cursor:pointer}
-  button.primary{background:linear-gradient(180deg,var(--blue2),var(--blue));border-color:transparent;
-    color:#04121f;font-weight:600;box-shadow:0 6px 20px -8px rgba(91,176,255,.7)}
-  button.primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
-  button:hover{border-color:var(--line2)} button.sm{padding:6px 10px;font-size:12px}
-  .grid{display:grid;grid-template-columns:1fr;gap:11px}
-  .card{background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
-    border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
-  .ev{display:flex;align-items:center;gap:13px;padding:13px 16px;border-radius:14px;background:var(--glass);
-    border:1px solid var(--line);position:relative;overflow:hidden;backdrop-filter:blur(14px);
-    transition:transform .2s,border-color .2s,background .2s}
-  .ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line2)}
-  .ev:hover{transform:translateY(-1px);border-color:var(--line2);background:var(--glass2)}
-  .ev.red::before{background:linear-gradient(180deg,var(--red),#c0343a)}
-  .ev.blue::before{background:linear-gradient(180deg,var(--blue2),var(--blue))}
-  .ev.inbound::before{background:linear-gradient(180deg,var(--purple),#7b6bd6)}
-  .ev.inbound{background:linear-gradient(90deg,rgba(179,157,255,.08),var(--glass) 45%)}
-  .ev .prio{width:72px;font:600 11px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em;padding-left:4px}
-  .ev.red .prio{color:var(--red)} .ev.blue .prio{color:var(--blue2)} .ev.inbound .prio{color:var(--purple)}
-  .ev .prio.none{color:var(--faint);font-weight:500}
-  .ev .main{flex:1;min-width:0} .ev .main b{font-size:14.5px;letter-spacing:-.005em}
-  .ev .sub{color:var(--dim);font-size:12.5px;margin-top:3px;font-family:var(--mono)}
-  .ev .time{color:var(--faint);font-size:12px;text-align:right;white-space:nowrap;font-family:var(--mono)}
-  .eta{font-family:var(--mono);font-weight:600;color:var(--purple);font-size:16px;white-space:nowrap;
-    font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-  .eta.live{animation:etaGlow 1.6s ease-in-out infinite}
-  @keyframes etaGlow{50%{text-shadow:0 0 16px rgba(179,157,255,.7)}}
-  .chip{display:inline-flex;background:var(--chip);border:1px solid var(--line);color:var(--dim);
-    border-radius:999px;padding:2px 10px;font-size:11px;margin-left:6px;font-family:var(--mono);white-space:nowrap}
-  .chip.mil{color:#ff9ea2;border-color:rgba(255,107,112,.32);background:rgba(255,107,112,.1)}
-  .chip.blocked{color:var(--gold);border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.09)}
-  .chip.first{color:var(--green);border-color:rgba(79,224,166,.32);background:rgba(79,224,166,.1)}
-  .chip.in{color:var(--purple);border-color:rgba(179,157,255,.3);background:rgba(179,157,255,.08)}
-  .chip.div{color:var(--orange);border-color:rgba(255,157,74,.32);background:rgba(255,157,74,.1)}
-  .dir{font-size:11px;color:var(--dim);font-family:var(--mono)}
-  .dir.arr{color:var(--green)} .dir.dep{color:var(--gold)} .dir.in{color:var(--purple)}
-  .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;padding:5px;border-radius:14px;
-    background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);box-shadow:var(--shadow)}
-  .tabs button{background:transparent;border:none;color:var(--dim);padding:9px 14px;border-radius:10px;
-    font-family:var(--disp);font-weight:600;font-size:13.5px;transition:all .2s}
-  .tabs button:hover{color:var(--ink);background:rgba(255,255,255,.04)}
-  .tabs button.active{color:#eaf3ff;background:linear-gradient(180deg,rgba(91,176,255,.22),rgba(91,176,255,.08));
-    box-shadow:inset 0 0 0 1px rgba(91,176,255,.25)}
-  .muted{color:var(--dim)} .empty{color:var(--dim);padding:28px;text-align:center}
-  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
-  .stat div{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:12px 16px;
-    backdrop-filter:blur(16px);box-shadow:var(--shadow)}
-  .stat div b{font-family:var(--mono);font-size:24px;display:block;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
-  .stat div span{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
-  label.f{display:block;margin:12px 0 4px;color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
-  .row2{display:flex;gap:20px;flex-wrap:wrap} .rowi{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
-  .cats{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-  .cats label{display:flex;gap:6px;align-items:center;background:var(--glass2);border:1px solid var(--line);
-    border-radius:10px;padding:6px 10px;font-size:13px;cursor:pointer}
-  .badge{font-size:11px;padding:2px 9px;border-radius:7px;margin-left:6px;font-family:var(--mono)}
-  .badge.sent{background:rgba(79,224,166,.12);color:var(--green)}
-  .badge.dry-run{background:rgba(255,209,102,.12);color:var(--gold)}
-  .badge.failed{background:rgba(255,107,112,.12);color:#ff9ea2}
-  input[type=text],input[type=email],input[type=number]{width:100%}
-  h3{margin:0 0 4px;font-family:var(--disp);font-weight:700;letter-spacing:-.01em}
-  .thumb{width:88px;height:58px;border-radius:11px;object-fit:cover;background:var(--glass2);
-    border:1px solid var(--line);flex-shrink:0;display:block}
-  .thumb.ph{display:grid;place-items:center;color:var(--dim);font-size:10px;text-align:center;line-height:1.2;font-family:var(--mono)}
-  .credit{font-size:10px;color:var(--faint);margin-top:3px;font-family:var(--mono)}
+  ::selection{background:rgba(232,32,42,.16)}
+
+  /* ---- top bar ---- */
+  header{display:flex;align-items:center;gap:14px;padding:0 20px;height:64px;background:var(--surface);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .brand .logo{height:40px;width:auto;display:block}
+  .brand .wm{font-family:var(--disp);font-weight:800;font-size:20px;letter-spacing:-.02em;color:var(--ink)}
+  .brand .wm em{color:var(--brand);font-style:normal}
+  header .tag{color:var(--dim);font-size:13px;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500}
+  .pill{font:600 11px/1 var(--mono);letter-spacing:.02em;padding:7px 11px;border-radius:999px;border:1px solid var(--line2);
+    background:var(--surface2);color:var(--dim);white-space:nowrap;display:inline-flex;align-items:center;gap:7px;text-transform:uppercase}
+  .pill.on{color:#0e9f66;border-color:#bfe9d5;background:#eafaf2}
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  .wrap{max-width:900px;margin:0 auto;padding:20px 18px 60px}
+
+  /* ---- toolbar ---- */
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  label.lb,.controls .muted{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  select,button,input{font-family:var(--sans);font-size:14px;font-weight:500;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line2);border-radius:10px;padding:9px 12px}
+  select:hover,input:hover{border-color:#b9c3d1}
+  select:focus,button:focus-visible,input:focus{outline:2px solid var(--sky);outline-offset:-1px}
+  button{cursor:pointer;font-weight:600}
+  button.primary,button.sm.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700;box-shadow:var(--shadow)}
+  button.primary:hover{background:var(--brand-2)}
+  button:hover{border-color:#b9c3d1} button.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+
+  /* ---- KPI ---- */
+  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+  .stat div{padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .stat div b{font-family:var(--sans);font-weight:800;font-size:24px;display:block;line-height:1.1;letter-spacing:-.02em}
+  .stat div span{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+
+  /* ---- legend ---- */
+  .legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:0 0 14px;padding:12px 16px;
+    border:1px solid var(--line);border-radius:14px;background:var(--surface);font-size:12.5px;color:var(--dim);box-shadow:var(--shadow)}
+  .legend .lgt{font-weight:800;color:var(--ink);font-size:12px;margin-right:2px}
+  .legend .lg{display:inline-flex;align-items:center;gap:7px} .legend .lg b{color:var(--ink2);font-weight:700}
+  .legend .d{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+  .legend .d.red{background:var(--red)} .legend .d.blue{background:var(--blue)}
+  .legend .d.violet{background:var(--violet)} .legend .d.amber{background:var(--gold)}
+
+  /* ---- tabs (pill) ---- */
+  .tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .tabs button{background:var(--surface);border:1px solid var(--line);color:var(--dim);padding:9px 15px;border-radius:999px;
+    font-family:var(--disp);font-weight:700;font-size:13.5px;box-shadow:var(--shadow)}
+  .tabs button:hover{color:var(--ink);border-color:#b9c3d1}
+  .tabs button.active{color:#fff;background:var(--ink);border-color:var(--ink)}
+
+  /* ---- plane list (the main view) ---- */
+  .grid{display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .card h3{font-weight:800;font-size:17px;margin:0 0 3px;letter-spacing:-.01em}
+  .card .lede,.card p.muted{color:var(--dim);font-size:13.5px;margin:5px 0 14px;max-width:70ch}
+
+  .ev{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;box-shadow:var(--shadow);position:relative;transition:box-shadow .15s,transform .15s;overflow:hidden}
+  .ev:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+  .ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line2)}
+  .ev.red::before{background:var(--red)} .ev.blue::before{background:var(--blue)} .ev.inbound::before{background:var(--violet)}
+  .ev .prio{display:none}                       /* status shown as color + chip, not a text column */
+  .ev .main{flex:1;min-width:0;order:2}
+  .ev .main b{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+  .ev .l1{display:flex;align-items:center;gap:2px;flex-wrap:wrap;line-height:1.15}
+  .ev .sub{color:var(--dim);font-size:12.5px;margin-top:3px;font-weight:500}
+  .ev .fl{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1.3}
+  .ev .time{color:var(--faint);font-size:12px;text-align:right;white-space:nowrap;font-family:var(--mono);order:3;align-self:flex-start}
+  .eta{font-family:var(--mono);font-weight:700;color:var(--violet);font-size:15px;white-space:nowrap;order:3}
+  .thumb{width:82px;height:58px;border-radius:12px;object-fit:cover;background:var(--surface2);border:1px solid var(--line);flex-shrink:0;display:block;order:1}
+  .thumb.ph{display:grid;place-items:center;color:var(--faint);font-size:9.5px;text-align:center;line-height:1.25;font-family:var(--mono);text-transform:uppercase;letter-spacing:.03em}
+  .thumb.ph.hasart{background-size:cover;background-position:center;background-repeat:no-repeat}
+  /* type guide */
+  .tg-cat{font:800 13px/1 var(--sans);text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:18px 2px 10px}
+  .tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .tg-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);text-align:center}
+  .tg-card img{width:100%;aspect-ratio:16/11;object-fit:cover;display:block;background:var(--surface2)}
+  .tg-card .nm{font-size:12px;font-weight:700;color:var(--ink);padding:8px 6px}
+  .credit{font-size:9.5px;color:var(--faint);margin-top:3px;font-family:var(--mono)}
   .credit a{color:var(--dim)}
-  .legend{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:0 0 16px;padding:13px 16px;
-    border-radius:14px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);
-    box-shadow:var(--shadow);font-size:12.5px;color:var(--dim)}
-  .legend .lgt{font-family:var(--disp);font-weight:700;color:var(--ink);font-size:13px;margin-right:4px}
-  .legend .lg{display:inline-flex;align-items:center;gap:7px} .legend .lg b{color:var(--ink);font-weight:600}
-  .legend .d{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-  .legend .d.red{background:var(--red)} .legend .d.blue{background:var(--blue2)}
-  .legend .d.violet{background:var(--purple)} .legend .d.amber{background:var(--gold)}
+
+  .chip{display:inline-flex;background:var(--surface2);border:1px solid var(--line2);color:var(--dim);border-radius:999px;
+    padding:2px 9px;font-size:10.5px;margin-left:6px;font-weight:700;white-space:nowrap;letter-spacing:.01em}
+  .chip.mil{color:#c81e2a;border-color:#f3c7cb;background:#fdeef0}
+  .chip.blocked{color:#b8860b;border-color:#f0e0b0;background:#fdf6e3}
+  .chip.first{color:#0e9f66;border-color:#bfe9d5;background:#eafaf2}
+  .chip.in{color:#6a4bff;border-color:#d8d0ff;background:#f2effe}
+  .chip.div{color:#d2691e;border-color:#f2d5b8;background:#fdf1e6}
+  .chip.dep{color:#d2691e;border-color:#f2d5b8;background:#fdf1e6}
+  .chip.emg{color:#fff;border-color:#c81e2a;background:#e8202a}
+  .dir{font-size:11px;color:var(--dim);font-weight:700}
+  .dir.arr{color:#0e9f66} .dir.dep{color:#d2691e} .dir.in{color:#6a4bff}
+  .dir.div{color:#d2691e} .dir.emg{color:#c81e2a}
+  .ev.emerg::before{background:#e8202a;width:5px}
+  .ev.emerg{box-shadow:0 0 0 1px #f3c7cb, var(--shadow)}
+
+  .muted{color:var(--dim)} .empty{color:var(--faint);padding:40px 20px;text-align:center;font-size:14px;
+    background:var(--surface);border:1px dashed var(--line2);border-radius:16px}
+  label.f{display:block;margin:12px 0 5px;color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+  .row2{display:flex;gap:22px;flex-wrap:wrap} .rowi{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .cats{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .cats label{display:flex;gap:6px;align-items:center;background:var(--surface2);border:1px solid var(--line2);border-radius:9px;padding:6px 10px;font-size:13px;cursor:pointer}
+  .badge{font-size:10.5px;padding:2px 9px;border-radius:999px;margin-left:6px;font-family:var(--sans);font-weight:700;text-transform:uppercase}
+  .badge.sent{background:#eafaf2;color:#0e9f66} .badge.dry-run{background:#fdf6e3;color:#b8860b} .badge.failed{background:#fdeef0;color:#c81e2a}
+  input[type=text],input[type=email],input[type=number]{width:100%}
+  h3{margin:0 0 4px;font-weight:800}
+
+  /* ---- radar (kept dark stage on light page) ---- */
+  .radar-wrap{display:grid;grid-template-columns:1fr 260px;gap:16px}
+  .radar-stage{background:radial-gradient(circle at 50% 50%,#0e1c33,#081324 72%);border:1px solid var(--line2);border-radius:16px;position:relative;overflow:hidden;aspect-ratio:1/1;box-shadow:var(--shadow)}
+  .radar-stage canvas{width:100%;height:100%;display:block;cursor:crosshair}
+  .radar-top{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .radar-top .rt{font-weight:800;font-size:18px}
+  .radar-top .rc{font-family:var(--mono);font-size:12px;color:var(--dim)} .radar-top .rc b{color:var(--brand)}
+  .r-side{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;align-self:start;box-shadow:var(--shadow)}
+  .r-side .h{padding:11px 15px;font:700 10px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line)}
+  .r-c{display:flex;gap:9px;align-items:center;padding:10px 13px;border-bottom:1px solid var(--line);cursor:pointer}
+  .r-c:last-child{border-bottom:none} .r-c:hover{background:var(--surface2)}
+  .r-c .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--sky)}
+  .r-c.hot .dot{background:var(--brand);box-shadow:0 0 8px rgba(232,32,42,.5)}
+  .r-c .nm{flex:1;min-width:0} .r-c .nm b{font-size:12.5px;font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-c .nm span{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  .r-c .dn{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap}
+  .r-detail{position:absolute;left:12px;bottom:12px;right:12px;background:rgba(255,255,255,.97);border:1px solid var(--line2);border-radius:12px;padding:12px 14px;display:none;gap:12px;align-items:center;box-shadow:var(--shadow-lg)}
+  .r-detail.on{display:flex}
+  .r-detail img{width:96px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--line2);background:var(--surface2)}
+  .r-detail .x{position:absolute;top:6px;right:10px;color:var(--faint);cursor:pointer;font-size:16px}
+  .r-detail b{font-size:14px;font-weight:700} .r-detail .m{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+
   @media(max-width:640px){
-    .ev{flex-wrap:wrap;gap:10px 12px} .ev .prio{width:auto;order:1}
-    .ev .thumb{order:2} .ev .main{order:4;flex-basis:100%} .ev .time,.ev .eta{order:3;margin-left:auto}
-    .tabs{overflow-x:auto;flex-wrap:nowrap} .tabs button{white-space:nowrap}
+    .radar-wrap{grid-template-columns:1fr} .r-side{max-height:230px;overflow:auto}
+    header{padding:0 14px;gap:10px} header .tag{display:none}
+    .wrap{padding:14px}
+    .tabs{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px} .tabs button{white-space:nowrap}
+    .stat{grid-template-columns:1fr 1fr}
+    .ev .time,.ev .eta{align-self:center}
+    .modal-card{max-height:88vh}
   }
+
+  /* ---- add-airport picker ---- */
+  .ghost{background:var(--surface);border:1px solid var(--line2);color:var(--dim);border-radius:10px;
+    padding:0 12px;height:38px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:.12s}
+  .ghost:hover{border-color:var(--brand);color:var(--brand)}
+  .modal{position:fixed;inset:0;background:rgba(16,24,40,.55);backdrop-filter:blur(3px);z-index:100;
+    display:none;align-items:flex-start;justify-content:center;padding:6vh 16px 16px}
+  .modal.on{display:flex}
+  .modal-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg);width:100%;max-width:560px;
+    padding:20px;display:flex;flex-direction:column;gap:12px;max-height:80vh}
+  .modal-h{display:flex;align-items:center;justify-content:space-between}
+  .modal-h b{font-size:18px;font-weight:800;letter-spacing:-.01em}
+  .modal-x{cursor:pointer;color:var(--faint);font-size:18px;padding:2px 6px;border-radius:8px}
+  .modal-x:hover{background:var(--surface2);color:var(--ink)}
+  .modal-sub{color:var(--dim);font-size:13px;margin-top:-4px}
+  #apSearch{width:100%;height:46px;border:1.5px solid var(--line2);border-radius:12px;padding:0 14px;font-size:15px;
+    font-family:var(--sans);background:var(--surface2);outline:none;transition:.12s}
+  #apSearch:focus{border-color:var(--sky);background:var(--surface)}
+  .ap-browse{display:flex;gap:8px}
+  .ap-browse select{flex:1;min-width:0;height:38px;border-radius:10px;border:1px solid var(--line2);
+    background:var(--surface);padding:0 8px;font-size:12.5px;color:var(--dim)}
+  .ap-results{overflow-y:auto;display:flex;flex-direction:column;gap:2px;min-height:120px}
+  .ap-r{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;
+    border:1px solid transparent;transition:.1s}
+  .ap-r:hover{background:var(--surface2);border-color:var(--line)}
+  .ap-code{font-family:var(--mono);font-weight:700;font-size:13px;color:var(--ink);flex-shrink:0;
+    width:52px;text-align:center;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:5px 0}
+  .ap-r.lg .ap-code{color:#fff;background:var(--sky);border-color:var(--sky)}
+  .ap-meta{flex:1;min-width:0}
+  .ap-meta b{font-size:13.5px;font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ap-meta span{font-size:11.5px;color:var(--faint);font-family:var(--mono)}
+  .ap-add{flex-shrink:0;font-size:11px;font-weight:800;color:var(--brand);border:1px solid #f3c7cb;background:#fdeef0;
+    border-radius:999px;padding:4px 11px;text-transform:uppercase;letter-spacing:.03em}
+  .ap-r.have .ap-add{color:#0e9f66;border-color:#bfe9d5;background:#eafaf2}
+  .ap-hint{color:var(--faint);font-size:13px;text-align:center;padding:26px 10px}
+  .pill.fa{background:#eef4ff;border:1px solid #cfe0fb;color:#2f6fe0;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:999px;font-weight:700}
+  .pill.fa.low{background:#fdf6e3;border-color:#f0e0b0;color:#b8860b}
+  .pill.fa.out{background:#fdeef0;border-color:#f3c7cb;color:#c81e2a}
+  .wx{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:0 0 14px;padding:11px 15px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);font-size:12.5px;color:var(--dim)}
+  .wx b{color:var(--ink);font-weight:700}
+  .wx .rwy{font-family:var(--mono);background:var(--surface2);border:1px solid var(--line2);border-radius:8px;padding:3px 9px;color:var(--ink);font-weight:700}
+  .wx .cat{font-weight:700;border-radius:6px;padding:2px 7px;font-size:11px}
+  .wx .cat.VFR{background:#eafaf2;color:#0e9f66} .wx .cat.MVFR{background:#eef4ff;color:#2f6fe0}
+  .wx .cat.IFR{background:#fdeef0;color:#c81e2a} .wx .cat.LIFR{background:#f3e2f7;color:#8e24aa}
 </style>
 </head>
 <body>
 <header>
-  <h1>✈︎ SpotAlert</h1>
-  <span class="tag">unusual-aircraft alerts · unfiltered feeds · predictive ETA · watchlists · logbook</span>
-  <span class="pill" id="sched">scheduler…</span>
+  <div class="brand">
+    <img class="logo" src="/static/logo_mark.png" alt="SpotAlert">
+    <span class="wm">Spot<em>Alert</em></span>
+  </div>
+  <span class="tag">Unusual-aircraft alerts &middot; unfiltered feeds &middot; predictive ETA &middot; watchlists &middot; logbook</span>
+  <span class="pill" id="sched">scheduler&hellip;</span>
 </header>
 <div class="wrap">
   <div class="controls" id="boardControls">
     <label class="muted">Airport</label><select id="airport"></select>
+    <button class="ghost" id="apAdd" title="Search every airport worldwide">＋ Add airport</button>
     <label class="muted">Window</label>
     <select id="hours"><option value="48">48h</option><option value="168">7d</option><option value="720" selected>30d</option></select>
     <label class="muted">Show</label>
     <select id="filter"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
     <button class="primary" id="refresh">↻ Run cycle now</button>
+    <button class="ghost" id="faScan" title="One FlightAware query: pre-takeoff, departures, enroute ETAs, diversions">✈ Scan FlightAware</button>
+    <span class="pill fa" id="faBudget" title="FlightAware free-tier queries left this month" style="display:none"></span>
   </div>
+  <div class="wx" id="wx" style="display:none"></div>
 
   <div class="stat" id="stat"></div>
 
@@ -152,22 +251,44 @@
   </div>
 
   <div class="tabs">
-    <button data-tab="board" class="active">Flight board</button>
+    <button data-tab="board" class="active">Planes</button>
+    <button data-tab="upcoming">Upcoming</button>
+    <button data-tab="radar">Radar</button>
     <button data-tab="inbound">Inbound ✦</button>
     <button data-tab="alerts">Alert feed</button>
     <button data-tab="notif">Notifications</button>
     <button data-tab="watch">Watchlists</button>
     <button data-tab="log">Logbook</button>
+    <button data-tab="guide">Type Guide</button>
     <button data-tab="settings">Settings</button>
   </div>
 
+  <div id="radar" style="display:none"></div>
+  <div id="upcoming" style="display:none"></div>
   <div id="board" class="grid"></div>
   <div id="inbound" style="display:none"></div>
   <div id="alerts" class="grid" style="display:none"></div>
   <div id="notif" class="grid" style="display:none"></div>
   <div id="watch" style="display:none"></div>
   <div id="log" style="display:none"></div>
+  <div id="guide" style="display:none"></div>
   <div id="settings" style="display:none"></div>
+</div>
+
+<div id="apModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-h">
+      <b>Add an airport</b>
+      <span class="modal-x" id="apClose">✕</span>
+    </div>
+    <div class="modal-sub">Search all 19,836 airports worldwide — by name, city, or code — or browse by country.</div>
+    <input id="apSearch" type="text" placeholder="Try “Phoenix”, “KLAX”, “Tokyo”, or “Bavaria”…" autocomplete="off">
+    <div class="ap-browse">
+      <select id="apCountry"><option value="">▾ Browse by country…</option></select>
+      <select id="apState" style="display:none"><option value="">▾ All states / regions</option></select>
+    </div>
+    <div id="apResults" class="ap-results"></div>
+  </div>
 </div>
 
 <script>
@@ -178,27 +299,58 @@ const CATS=["special","warbird","tanker","testbed","military","gov","private","c
 async function j(u,o){const r=await fetch(u,o);return r.json();}
 function fmtTime(ts){return new Date(ts*1000).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
 
+// direction -> {label, css, predictive?} for the flight line
+const DIRMAP={
+  arrival:{t:'▼ Arrived',c:'arr'}, departure:{t:'▲ Departed',c:'dep'},
+  scheduled:{t:'✦ Pre-takeoff',c:'in',pred:1}, enroute:{t:'✦ Inbound',c:'in',pred:1},
+  inbound:{t:'✦ Inbound',c:'in',pred:1}, departing:{t:'▲ Departing soon',c:'dep',pred:1},
+  diversion:{t:'⤳ Diverting here',c:'div',pred:1}, cancelled:{t:'✕ Cancelled',c:'div'},
+  emergency:{t:'⚠ Emergency',c:'emg',pred:1},
+};
 function evRow(e){
-  const prio=e.direction==='inbound'?'inbound':(e.priority||'none');
-  const label=e.direction==='inbound'?'inbound':(e.priority||'—');
-  const dir=e.direction==='arrival'?'<span class="dir arr">▼ arr</span>'
-    :e.direction==='departure'?'<span class="dir dep">▲ dep</span>'
-    :'<span class="dir in">✦ inbound</span>';
-  const chips=[];
-  if((e.reason||"").includes("FIRST-EVER"))chips.push('<span class="chip first">first-ever</span>');
-  if((e.reason||"").includes("DIVERSION"))chips.push('<span class="chip div">diversion</span>');
-  if(e.direction==='inbound')chips.push('<span class="chip in">predictive</span>');
-  if(e.is_blocked)chips.push('<span class="chip blocked">blocked/notable</span>');
-  if(["military","gov","warbird","tanker","testbed"].includes(e.category))chips.push('<span class="chip mil">'+e.category+'</span>');
-  (e.interest_tags||[]).forEach(t=>chips.push('<span class="chip">'+t+'</span>'));
-  const right=e.direction==='inbound'&&e.eta_minutes!=null
-    ?`<div class="eta">ETA ~${e.eta_minutes}m</div>`:`<div class="time">${fmtTime(e.event_time)}</div>`;
-  return `<div class="ev ${prio}"><div class="prio ${prio==='none'?'none':''}">${label}</div>
-    <div class="thumb ph" data-hex="${e.icao24}">loading<br>photo…</div>
-    <div class="main"><b>${e.display||e.icao24}</b> ${chips.join("")}
-      <div class="sub">${dir} ${e.callsign?('· '+e.callsign):''} ${e.reason?('· '+e.reason):''}</div>
-      <div class="credit" data-cred="${e.icao24}"></div></div>
-    ${right}</div>`;
+  const d=e.direction||'';
+  const predPrio=['scheduled','enroute','inbound','departing','diversion','emergency'].includes(d);
+  const prio=d==='emergency'?'emerg':(predPrio?'inbound':(e.priority||'none'));
+  const parts=(e.display||e.icao24||'').split(' · ');
+  const tail=parts[0]||e.callsign||e.icao24;
+  const typeop=parts.slice(1).join(' · ');
+  const dm=DIRMAP[d]||{t:'✦ '+d,c:'in'};
+  const dir=`<span class="dir ${dm.c}">${dm.t}</span>`;
+  const R=(e.reason||'');
+  // one concise status chip (most relevant), no clutter
+  let chip='';
+  if(d==='emergency')chip='<span class="chip emg">emergency</span>';
+  else if(R.includes('FIRST-EVER'))chip='<span class="chip first">first-ever</span>';
+  else if(d==='diversion'||R.includes('DIVERSION'))chip='<span class="chip div">diversion</span>';
+  else if(d==='cancelled')chip='<span class="chip div">cancelled</span>';
+  else if(d==='departing')chip='<span class="chip dep">departing</span>';
+  else if(d==='enroute')chip='<span class="chip in">enroute</span>';
+  else if(d==='scheduled'||R.includes('SCHEDULED'))chip='<span class="chip in">pre-takeoff</span>';
+  else if(d==='inbound')chip='<span class="chip in">inbound</span>';
+  else if(['military','gov','warbird','tanker','testbed'].includes(e.category))chip='<span class="chip mil">'+e.category+'</span>';
+  else if(e.is_blocked)chip='<span class="chip blocked">notable</span>';
+  else if((e.interest_tags||[]).length)chip='<span class="chip">'+e.interest_tags[0]+'</span>';
+  // right-hand ETA/lead badge for predictive kinds
+  let right='';
+  if(e.eta_minutes!=null&&['enroute','inbound','departing'].includes(d))
+    right=`<div class="eta">${d==='departing'?'T-':'ETA '}${e.eta_minutes}m</div>`;
+  let when;
+  if(d==='scheduled')when='arrives '+fmtTime(e.event_time);
+  else if(d==='departing')when='departs '+fmtTime(e.event_time);
+  else if(d==='enroute'||d==='diversion')when='ETA '+fmtTime(e.event_time);
+  else when=fmtTime(e.event_time);
+  const art=e.type_art?('/static/types/'+e.type_art+'.png'):'';
+  const thumb=art
+    ? `<div class="thumb ph hasart" data-hex="${e.icao24}" data-art="${art}" style="background-image:url('${art}')"></div>`
+    : `<div class="thumb ph" data-hex="${e.icao24}">no<br>photo</div>`;
+  return `<div class="ev ${prio}">
+    ${thumb}
+    <div class="main">
+      <div class="l1"><b>${tail}</b>${chip}</div>
+      <div class="sub">${typeop||'&nbsp;'}</div>
+      <div class="fl">${dir} · ${when}${e.callsign&&e.callsign!==tail?(' · '+e.callsign):''}</div>
+      <div class="credit" data-cred="${e.icao24}"></div>
+    </div>${right}</div>`;
 }
 
 async function loadBoard(){
@@ -210,6 +362,41 @@ async function loadBoard(){
     <div><b style="color:var(--blue)">${blue}</b><span>low priority</span></div>
     <div><b style="color:var(--gold)">${blk}</b><span>blocked/notable frames</span></div>`;
   $("#board").innerHTML=data.events.length?data.events.map(evRow).join(""):'<div class="empty">No matching traffic. Try “All traffic” or “Run cycle now”.</div>';
+  loadWx(); loadFaBudget();
+}
+async function loadGuide(){
+  const d=await j('/api/typeguide'); const types=d.types||[];
+  const cats=[['private','Private Jets'],['airliner','Commercial Airliners'],['helicopter','Helicopters']];
+  let html='<div class="card"><h3>Aircraft Type Guide</h3><p class="lede">Learn to spot what you see — every type the app illustrates. These same pictures appear as the thumbnail in your feed whenever a real photo isn’t available.</p></div>';
+  for(const [key,label] of cats){
+    const items=types.filter(t=>t.category===key); if(!items.length) continue;
+    html+=`<div class="tg-cat">${label} · ${items.length}</div><div class="tg-grid">`;
+    html+=items.map(t=>`<div class="tg-card"><img loading="lazy" src="/static/types/${t.slug}.png" alt="${t.name}"><div class="nm">${t.name}</div></div>`).join('');
+    html+='</div>';
+  }
+  $('#guide').innerHTML=html;
+}
+async function loadFaBudget(){
+  try{const u=await j('/api/flightaware/usage'); const el=$('#faBudget');
+    if(!el)return;
+    if(!u.enabled){el.style.display='none';return;}
+    el.style.display=''; el.textContent=`FA: ${u.remaining} scans left`;
+    el.className='pill fa'+(u.remaining<=0?' out':(u.remaining<50?' low':''));
+  }catch(e){}
+}
+async function loadWx(){
+  const ap=$("#airport").value, el=$("#wx"); if(!ap||!el){if(el)el.style.display='none';return;}
+  try{const w=await j('/api/weather/'+ap);
+    if(!w.ok){el.style.display='none';return;}
+    el.style.display='flex';
+    const rwy=w.active_runway?`<span class="rwy">Rwy ${w.active_runway}</span>`:'';
+    const cat=w.flight_category?`<span class="cat ${w.flight_category}">${w.flight_category}</span>`:'';
+    el.innerHTML=`${cat} <b>${ap}</b> ${rwy} `+
+      (w.wind_dir!=null?`· wind <b>${w.wind_dir}°</b> @ ${w.wind_kt||0}kt`+(w.wind_gust_kt?` G${w.wind_gust_kt}`:'')+' ':'')+
+      (w.temp_c!=null?`· ${w.temp_c}°C `:'')+
+      (w.visibility!=null?`· vis ${w.visibility} `:'')+
+      (w.clouds&&w.clouds.length?'· '+w.clouds.join(' '):'');
+  }catch(e){el.style.display='none';}
 }
 async function loadAlerts(){
   const data=await j(`/api/alerts?airport=${$("#airport").value}&limit=200`);
@@ -384,8 +571,10 @@ async function testPush(){
 }
 async function loadScheduler(){
   const s=await j("/api/scheduler");const el=$("#sched");
-  if(s.enabled){el.className="pill on";el.textContent=`● scheduler on · every ${s.interval_sec}s · ${s.runs} runs`;}
-  else{el.className="pill";el.textContent="scheduler off";}
+  const mob=window.innerWidth<=640;
+  if(s.enabled){el.className="pill on";
+    el.textContent=mob?`● live` : `● live · ${s.interval_sec}s · ${s.runs} runs`;}
+  else{el.className="pill";el.textContent="offline";}
 }
 const PHOTOS={};
 async function loadPhotos(){
@@ -401,25 +590,214 @@ async function loadPhotos(){
       img.style.cursor="pointer"; n.replaceWith(img);
       const cred=document.querySelector(`.credit[data-cred="${hex}"]`);
       if(cred&&p.photographer) cred.innerHTML=`photo © ${p.photographer} · <a href="${p.link}" target="_blank">${p.credit||'source'}</a>`;
+    } else if(n.dataset.art){
+      /* keep the type illustration already shown as background */
     } else {
-      n.classList.remove('ph'); n.classList.add('ph'); n.innerHTML="no<br>photo";
+      n.innerHTML="no<br>photo";
     }
   }
 }
-const LOADERS={board:loadBoard,inbound:loadInbound,alerts:loadAlerts,notif:loadNotif,watch:loadWatch,log:loadLog,settings:loadSettings};
+// ---------------- LIVE RADAR ----------------
+let RADAR={raf:null,poll:null,contacts:[],sweep:0,radius:40,ap:null};
+async function loadRadar(){
+  const ap=RADAR.ap||(AIRPORTS[0]&&AIRPORTS[0].icao);RADAR.ap=ap;
+  $("#radar").innerHTML=`
+    <div class="radar-top">
+      <span class="rt">Live radar</span>
+      <select id="radarAp">${AIRPORTS.map(a=>`<option value="${a.icao}" ${a.icao===ap?'selected':''}>${a.icao} — ${a.name}</option>`).join("")}</select>
+      <select id="radarRad"><option value="40">40 nm</option><option value="80">80 nm</option><option value="20">20 nm</option></select>
+      <span class="rc" id="radarCount">scanning&hellip;</span>
+    </div>
+    <div class="radar-wrap">
+      <div class="radar-stage">
+        <canvas id="radarCv" width="720" height="720"></canvas>
+        <div class="r-detail" id="radarDetail"></div>
+      </div>
+      <div class="r-side"><div class="h">Contacts in range</div><div id="radarList"><div class="empty" style="padding:20px">scanning&hellip;</div></div></div>
+    </div>`;
+  $("#radarAp").onchange=e=>{RADAR.ap=e.target.value;pollRadar();};
+  $("#radarRad").onchange=e=>{RADAR.radius=+e.target.value;pollRadar();};
+  $("#radarCv").onclick=radarClick;
+  startRadarAnim();
+  await pollRadar();
+  RADAR.poll=setInterval(pollRadar,9000);
+}
+function stopRadar(){if(RADAR.raf)cancelAnimationFrame(RADAR.raf);if(RADAR.poll)clearInterval(RADAR.poll);RADAR.raf=RADAR.poll=null;}
+async function pollRadar(){
+  try{const d=await j(`/api/live/${RADAR.ap}?radius=${RADAR.radius}`);RADAR.contacts=d.contacts||[];renderRadarSide(d);}
+  catch(e){RADAR.contacts=[];}
+}
+function renderRadarSide(d){
+  const hot=RADAR.contacts.filter(c=>c.notable).length;
+  const cc=$("#radarCount");if(cc)cc.innerHTML=`<b>${d.count}</b> contacts · ${hot} notable`;
+  const list=$("#radarList");if(!list)return;
+  list.innerHTML=RADAR.contacts.length?RADAR.contacts.slice(0,30).map((c,i)=>`
+    <div class="r-c ${c.notable?'hot':''}" onclick="showRadarDetail(${i})">
+      <span class="dot"></span>
+      <div class="nm"><b>${c.display}</b><span>${c.type||''} ${c.alt&&c.alt!=='ground'?('· '+c.alt+'ft'):(c.alt==='ground'?'· ground':'')}</span></div>
+      <span class="dn">${Math.round(c.dist_nm)}nm</span>
+    </div>`).join(""):'<div class="empty" style="padding:20px">No aircraft in range right now.</div>';
+}
+function startRadarAnim(){
+  const cv=$("#radarCv");if(!cv)return;const x=cv.getContext('2d');const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W*.46;
+  function frame(){
+    x.clearRect(0,0,W,H);
+    x.strokeStyle='rgba(61,155,239,.22)';x.lineWidth=1.5;
+    for(let i=1;i<=3;i++){x.beginPath();x.arc(cx,cy,R*i/3,0,7);x.stroke();}
+    x.beginPath();x.moveTo(cx-R,cy);x.lineTo(cx+R,cy);x.moveTo(cx,cy-R);x.lineTo(cx,cy+R);x.stroke();
+    x.fillStyle='rgba(147,166,196,.6)';x.font='600 13px IBM Plex Mono,monospace';x.textAlign='center';
+    x.fillText('N',cx,cy-R-6);x.fillText('S',cx,cy+R+16);x.textAlign='left';x.fillText('E',cx+R+6,cy+4);x.textAlign='right';x.fillText('W',cx-R-6,cy+4);
+    // airport center
+    x.fillStyle='#57a8ec';x.beginPath();x.arc(cx,cy,4,0,7);x.fill();
+    // sweep (red, logo)
+    x.save();x.translate(cx,cy);x.rotate(RADAR.sweep);
+    const g=x.createLinearGradient(0,0,0,-R);g.addColorStop(0,'rgba(236,31,43,.35)');g.addColorStop(1,'rgba(236,31,43,0)');
+    x.fillStyle=g;x.beginPath();x.moveTo(0,0);x.arc(0,0,R,-Math.PI/2-0.45,-Math.PI/2);x.closePath();x.fill();
+    x.strokeStyle='rgba(255,77,87,.9)';x.lineWidth=2;x.beginPath();x.moveTo(0,0);x.lineTo(0,-R);x.stroke();x.restore();
+    // blips
+    const sweepDeg=((-RADAR.sweep*180/Math.PI)+360)%360; // 0=N
+    RADAR.contacts.forEach(c=>{
+      const ratio=Math.min(1,c.dist_nm/RADAR.radius);const rad=(c.bearing||0)*Math.PI/180;
+      const bx=cx+Math.sin(rad)*R*ratio,by=cy-Math.cos(rad)*R*ratio;
+      let diff=Math.abs(sweepDeg-(c.bearing||0));if(diff>180)diff=360-diff;const near=diff<30;
+      const col=c.notable?'#ff4d57':'#3d9bef';
+      if(near){x.globalAlpha=.5;x.strokeStyle=col;x.lineWidth=1.5;x.beginPath();x.arc(bx,by,12,0,7);x.stroke();x.globalAlpha=1;}
+      x.fillStyle=col;x.beginPath();x.arc(bx,by,c.notable?5.5:4,0,7);x.fill();
+      if(c.notable){x.fillStyle='rgba(234,241,251,.85)';x.font='600 11px IBM Plex Mono,monospace';x.textAlign='left';
+        x.fillText((c.registration||c.callsign||'').slice(0,8),bx+9,by+4);}
+    });
+    RADAR.sweep+=0.018;RADAR.raf=requestAnimationFrame(frame);
+  }
+  frame();
+}
+function radarClick(ev){
+  const cv=$("#radarCv");const r=cv.getBoundingClientRect();const sx=cv.width/r.width,sy=cv.height/r.height;
+  const px=(ev.clientX-r.left)*sx,py=(ev.clientY-r.top)*sy;const W=cv.width,cx=W/2,cy=W/2,R=W*.46;
+  let best=-1,bd=1e9;
+  RADAR.contacts.forEach((c,i)=>{const ratio=Math.min(1,c.dist_nm/RADAR.radius);const rad=(c.bearing||0)*Math.PI/180;
+    const bx=cx+Math.sin(rad)*R*ratio,by=cy-Math.cos(rad)*R*ratio;const d=Math.hypot(px-bx,py-by);if(d<bd&&d<26){bd=d;best=i;}});
+  if(best>=0)showRadarDetail(best);
+}
+async function showRadarDetail(i){
+  const c=RADAR.contacts[i];if(!c)return;const el=$("#radarDetail");
+  el.innerHTML=`<span class="x" onclick="$('#radarDetail').classList.remove('on')">×</span>
+    <img id="rdImg" alt=""><div><b>${c.display}</b>${c.notable?' <span class="chip mil">notable</span>':''}
+      <div class="m">${c.type||'—'} · ${c.dist_nm}nm · brg ${Math.round(c.bearing)}° · ${c.alt&&c.alt!=='ground'?c.alt+'ft':(c.alt||'—')} · ${c.gs||'—'}kt</div></div>`;
+  el.classList.add('on');
+  try{const p=await j(`/api/photo/${c.icao24}`);if(p&&p.thumbnail){const im=$("#rdImg");if(im)im.src=p.thumbnail;}}catch(e){}
+}
+// ---------------- UPCOMING (pre-takeoff) ----------------
+async function loadUpcoming(){
+  const ap=RADAR.ap||(AIRPORTS[0]&&AIRPORTS[0].icao);
+  const d=await j(`/api/upcoming/${ap}`);
+  const note=d.flightaware?"":`<div class="card"><h3>Pre-takeoff alerts</h3>
+    <p class="lede">This is the JetTip-style heads-up <b>before a plane even takes off</b>. It needs a FlightAware key
+    (free tier). Add <b>FLIGHTAWARE_API_KEY</b> on your server and notable aircraft <b>scheduled</b> into ${ap} will
+    appear here — often the day before — and push to your phone.</p></div>`;
+  const rows=(d.upcoming||[]).map(u=>{
+    const lh=Math.floor(u.lead_minutes/60),lm=u.lead_minutes%60;
+    return `<div class="ev red">
+      <div class="prio">sched</div>
+      <div class="thumb ph" data-hex="${u.icao24}">loading<br>photo…</div>
+      <div class="main"><b>${u.display}</b> <span class="chip in">pre-takeoff</span>
+        <div class="sub">✦ ${u.reason||'scheduled arrival'}</div><div class="credit" data-cred="${u.icao24}"></div></div>
+      <div class="eta">${lh}h${String(lm).padStart(2,'0')}</div></div>`;}).join("");
+  $("#upcoming").innerHTML=note+`<div class="grid">${rows||'<div class="empty">Nothing notable scheduled yet'+(d.flightaware?'':' — add a FlightAware key to enable this')+'.</div>'}</div>`;
+}
+const LOADERS={radar:loadRadar,upcoming:loadUpcoming,board:loadBoard,inbound:loadInbound,alerts:loadAlerts,notif:loadNotif,watch:loadWatch,log:loadLog,guide:loadGuide,settings:loadSettings};
 function switchTab(t){
+  if(TAB==="radar"&&t!=="radar")stopRadar();
   TAB=t;
   document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["board","inbound","alerts","notif","watch","log","settings"].forEach(id=>{
+  ["radar","upcoming","board","inbound","alerts","notif","watch","log","guide","settings"].forEach(id=>{
     const grid=(id==="board"||id==="alerts"||id==="notif");
     $("#"+id).style.display=(id===t)?(grid?"grid":"block"):"none";});
   $("#boardControls").style.display=(t==="board")?"flex":"none";
   $("#stat").style.display=(t==="board")?"flex":"none";
+  const lg=$("#legend");if(lg)lg.style.display=(t==="board")?"flex":"none";
   Promise.resolve(LOADERS[t]()).then(loadPhotos);
 }
+// ---- add-airport picker ----------------------------------------------
+function apRow(a){
+  const cls=a.type==="large"?"lg":"";
+  const have=a.tracked?"have":"";
+  const loc=[a.country,a.state,a.city].filter(x=>x&&x!=="—").join(" › ");
+  return `<div class="ap-r ${cls} ${have}" data-icao="${a.icao}">
+    <div class="ap-code">${a.icao}</div>
+    <div class="ap-meta"><b>${a.name}</b><span>${loc}${a.iata?(" · "+a.iata):""}</span></div>
+    <div class="ap-add">${a.tracked?"tracking":"add"}</div></div>`;
+}
+function apRender(list,emptyMsg){
+  const box=$("#apResults");
+  if(!list.length){box.innerHTML=`<div class="ap-hint">${emptyMsg||"No matches."}</div>`;return;}
+  box.innerHTML=list.map(apRow).join("");
+  box.querySelectorAll(".ap-r").forEach(el=>el.onclick=()=>apSelect(el.dataset.icao,el));
+}
+async function apSelect(icao,el){
+  if(el){el.querySelector(".ap-add").textContent="…";}
+  const r=await j("/api/airports/select",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({icao})});
+  if(!r.ok){if(el)el.querySelector(".ap-add").textContent="error";return;}
+  await refreshAirports(icao);
+  apCloseModal();
+  if(TAB==="board")loadBoard().then(loadPhotos);
+}
+async function refreshAirports(sel){
+  AIRPORTS=await j("/api/airports");
+  const cur=sel||$("#airport").value||(AIRPORTS[0]&&AIRPORTS[0].icao);
+  $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}" ${a.icao===cur?'selected':''}>${a.icao} — ${a.name}</option>`).join("");
+}
+let apTimer=null;
+function apOpenModal(){
+  $("#apModal").classList.add("on");
+  $("#apSearch").value="";$("#apSearch").focus();
+  $("#apResults").innerHTML=`<div class="ap-hint">Start typing to search 19,836 airports.</div>`;
+}
+function apCloseModal(){$("#apModal").classList.remove("on");}
+function wireApModal(){
+  $("#apAdd").onclick=apOpenModal;
+  $("#apClose").onclick=apCloseModal;
+  $("#apModal").onclick=e=>{if(e.target.id==="apModal")apCloseModal();};
+  $("#apSearch").oninput=e=>{
+    clearTimeout(apTimer);
+    const q=e.target.value.trim();
+    $("#apCountry").value="";$("#apState").style.display="none";
+    if(q.length<1){$("#apResults").innerHTML=`<div class="ap-hint">Start typing to search 19,836 airports.</div>`;return;}
+    apTimer=setTimeout(async()=>{
+      const r=await j(`/api/airports/search?q=${encodeURIComponent(q)}&limit=60`);
+      apRender(r.results,`No airport matches “${q}”.`);
+    },180);
+  };
+  // browse by country -> state -> list
+  j("/api/airports/countries").then(cs=>{
+    $("#apCountry").innerHTML=`<option value="">▾ Browse by country…</option>`+
+      cs.map(c=>`<option value="${c.country}">${c.country} (${c.count})</option>`).join("");
+  });
+  $("#apCountry").onchange=async()=>{
+    const c=$("#apCountry").value;$("#apSearch").value="";
+    if(!c){$("#apState").style.display="none";$("#apResults").innerHTML=`<div class="ap-hint">Start typing to search 19,836 airports.</div>`;return;}
+    const st=await j(`/api/airports/states?country=${encodeURIComponent(c)}`);
+    if(st.length>1){
+      $("#apState").style.display="";
+      $("#apState").innerHTML=`<option value="">▾ All states / regions (${st.reduce((n,s)=>n+s.count,0)})</option>`+
+        st.map(s=>`<option value="${s.state}">${s.state} (${s.count})</option>`).join("");
+    }else{$("#apState").style.display="none";}
+    const r=await j(`/api/airports/browse?country=${encodeURIComponent(c)}`);
+    apRender(r.results);
+  };
+  $("#apState").onchange=async()=>{
+    const c=$("#apCountry").value,s=$("#apState").value;
+    const u=`/api/airports/browse?country=${encodeURIComponent(c)}`+(s?`&state=${encodeURIComponent(s)}`:"");
+    const r=await j(u);apRender(r.results);
+  };
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")apCloseModal();});
+}
+
 async function init(){
   AIRPORTS=await j("/api/airports");
-  $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}">${a.icao} — ${a.name}</option>`).join("");
+  const home=AIRPORTS.find(a=>a.icao==="KPHX")?"KPHX":(AIRPORTS[0]&&AIRPORTS[0].icao);
+  RADAR.ap=home;
+  $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}" ${a.icao===home?'selected':''}>${a.icao} — ${a.name}</option>`).join("");
+  wireApModal();
   document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   ["airport","hours","filter"].forEach(id=>$("#"+id).onchange=()=>{if(TAB==="board")loadBoard().then(loadPhotos);});
   $("#refresh").onclick=async()=>{
@@ -430,8 +808,20 @@ async function init(){
     alert(`Sources: ${(r.sources||[]).join(", ")}\nNew visits: ${r.new_visits} · alerts: ${r.new_alerts}\nInbound found: ${(r.inbound&&r.inbound.new_alerts)||0}\nNotify — dry-run:${d.dry_run||0} sent:${d.sent||0} watchlist:${d.watchlist_hits||0}`+(r.note?`\n\n${r.note}`:""));
     switchTab(TAB);loadScheduler();
   };
+  const fs=$("#faScan");
+  if(fs)fs.onclick=async()=>{
+    fs.textContent="Scanning…";fs.disabled=true;
+    const r=await j(`/api/flightaware/scan?airport=${$("#airport").value}`,{method:"POST"});
+    fs.textContent="✈ Scan FlightAware";fs.disabled=false;
+    if(!r.ok){alert(r.note||"FlightAware scan unavailable.");}
+    else{alert(`FlightAware scan done.\nNew alerts: ${r.new_alerts}\nQueries left this month: ${r.budget_remaining}`);}
+    loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
+  };
   loadScheduler();setInterval(loadScheduler,15000);
+  loadFaBudget();
   switchTab("board");
+  // register the service worker so SpotAlert is installable as an app (PWA)
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
 }
 init();
 </script>

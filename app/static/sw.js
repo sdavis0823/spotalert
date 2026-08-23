@@ -1,4 +1,9 @@
-// SpotAlert service worker — receives web-push messages and shows notifications.
+// SpotAlert service worker — makes the app installable (PWA) and receives push.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
+// Network-first passthrough (a fetch handler is required for installability).
+self.addEventListener("fetch", () => {});
+
 self.addEventListener("push", event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
