@@ -4,12 +4,6 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>SpotAlert — unusual aircraft alerts</title>
-<link rel="manifest" href="/static/manifest.webmanifest">
-<meta name="theme-color" content="#0a1017">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="SpotAlert">
-<link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@600;700;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -438,8 +432,6 @@ async function init(){
   };
   loadScheduler();setInterval(loadScheduler,15000);
   switchTab("board");
-  // register the service worker so SpotAlert is installable as an app (PWA)
-  if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
 }
 init();
 </script>
