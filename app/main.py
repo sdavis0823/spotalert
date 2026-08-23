@@ -139,6 +139,18 @@ def airports_select(body: SelectAirport):
     return {"ok": True, "airport": a}
 
 
+@app.post("/api/airports/remove")
+def airports_remove(body: SelectAirport):
+    """Stop tracking an airport (removes it and its alerts/visits)."""
+    icao = body.icao.upper()
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM airports WHERE icao=?", (icao,))
+        conn.execute("DELETE FROM alerts WHERE airport_icao=?", (icao,))
+        conn.execute("DELETE FROM visits WHERE airport_icao=?", (icao,))
+        conn.commit()
+    return {"ok": True, "removed": icao}
+
+
 def _tracked_set() -> set[str]:
     with db.get_conn() as conn:
         return {r["icao"].upper() for r in conn.execute("SELECT icao FROM airports").fetchall()}

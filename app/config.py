@@ -76,6 +76,9 @@ SCHEDULED_SCAN_INTERVAL_SEC = int(os.environ.get("SCHEDULED_SCAN_INTERVAL_SEC", 
 # Default cadence = every 6h (~4 automatic scans/day per airport) so a handful
 # of airports stay well inside the free Starter tier's 500 queries/month.
 FA_AIRPORT_SCAN_INTERVAL_SEC = int(os.environ.get("FA_AIRPORT_SCAN_INTERVAL_SEC", "21600"))
+# Free Starter tier allows only 5 queries/minute — throttle to stay under it so
+# we don't get 429 rate-limit errors when scanning several airports at once.
+FA_RATE_PER_MIN = int(os.environ.get("FA_RATE_PER_MIN", "5"))
 # HARD monthly cap on FlightAware queries — the app refuses to call AeroAPI once
 # this many have been made in the current calendar month, so you can NEVER be
 # pushed past the free tier into a paid overage. Set below the real 500 limit.

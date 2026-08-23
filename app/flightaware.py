@@ -14,12 +14,32 @@ the free live layer only. Uses the cheapest useful call:
     GET /airports/{id}/flights/scheduled_arrivals
 """
 import time
+import collections
 import httpx
 from . import config, aircraft as ac_mod
 
 
 # Last AeroAPI error seen (for the /usage diagnostic). None when healthy.
 _LAST_ERROR = None
+
+# Sliding-window rate limiter — the free tier allows only ~5 queries/minute.
+_CALL_TIMES = collections.deque()
+
+
+def _rate_wait():
+    """Block until making another AeroAPI call stays within the per-minute cap."""
+    win = 60.0
+    now = time.time()
+    while _CALL_TIMES and now - _CALL_TIMES[0] > win:
+        _CALL_TIMES.popleft()
+    if len(_CALL_TIMES) >= max(1, config.FA_RATE_PER_MIN):
+        sleep_for = win - (now - _CALL_TIMES[0]) + 0.5
+        if sleep_for > 0:
+            time.sleep(min(sleep_for, 65))
+        now = time.time()
+        while _CALL_TIMES and now - _CALL_TIMES[0] > win:
+            _CALL_TIMES.popleft()
+    _CALL_TIMES.append(time.time())
 
 
 def last_error():
@@ -85,6 +105,7 @@ class FlightAwareSource:
         if not self.budget_ok():
             return None  # hard stop — monthly free-tier budget exhausted
         global _LAST_ERROR
+        _rate_wait()  # respect the free tier's per-minute rate limit
         headers = {"x-apikey": config.FLIGHTAWARE_API_KEY, "Accept": "application/json"}
         url = f"{config.FLIGHTAWARE_BASE}{path}"
         try:
