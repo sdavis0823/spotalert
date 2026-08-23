@@ -205,6 +205,11 @@
     border-radius:999px;padding:4px 11px;text-transform:uppercase;letter-spacing:.03em}
   .ap-r.have .ap-add{color:#0e9f66;border-color:#bfe9d5;background:#eafaf2}
   .ap-hint{color:var(--faint);font-size:13px;text-align:center;padding:26px 10px}
+  .catbar{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px}
+  .catchip{cursor:pointer;user-select:none;border:1px solid var(--line2);background:var(--surface);color:var(--dim);
+    border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;transition:.12s;white-space:nowrap}
+  .catchip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .catchip:not(.on){opacity:.55;text-decoration:line-through}
   .pill.fa{background:#eef4ff;border:1px solid #cfe0fb;color:#2f6fe0;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:999px;font-weight:700}
   .pill.fa.low{background:#fdf6e3;border-color:#f0e0b0;color:#b8860b}
   .pill.fa.out{background:#fdeef0;border-color:#f3c7cb;color:#c81e2a}
@@ -239,6 +244,7 @@
     <span class="pill fa" id="faBudget" title="FlightAware free-tier queries left this month" style="display:none"></span>
   </div>
   <div class="wx" id="wx" style="display:none"></div>
+  <div class="catbar" id="catbar"></div>
 
   <div class="stat" id="stat"></div>
 
@@ -353,15 +359,44 @@ function evRow(e){
     </div>${right}</div>`;
 }
 
+// category filter groups — toggle what shows on the board
+const CATGROUPS=[
+  {k:'special',  label:'Special liveries', m:e=>e.category==='special'||(e.interest_tags||[]).some(t=>/livery|heritage|retro/i.test(t))},
+  {k:'charter',  label:'Sports/team charters', m:e=>e.category==='charter'||(e.interest_tags||[]).includes('charter')||/CHARTER/i.test(e.reason||'')},
+  {k:'diversion',label:'Diversions', m:e=>e.direction==='diversion'||/DIVERSION/i.test(e.reason||'')},
+  {k:'enroute',  label:'Inbound / enroute', m:e=>['enroute','inbound'].includes(e.direction)},
+  {k:'scheduled',label:'Pre-takeoff', m:e=>e.direction==='scheduled'||/SCHEDULED/i.test(e.reason||'')},
+  {k:'emergency',label:'Emergencies', m:e=>e.direction==='emergency'},
+  {k:'military', label:'Military',   m:e=>e.category==='military'},
+  {k:'gov',      label:'Gov / VIP',  m:e=>e.category==='gov'},
+  {k:'warbird',  label:'Warbirds',   m:e=>e.category==='warbird'},
+  {k:'tanker',   label:'Tankers',    m:e=>e.category==='tanker'},
+  {k:'testbed',  label:'Testbeds',   m:e=>e.category==='testbed'},
+  {k:'private',  label:'Private jets',m:e=>e.category==='private'||(e.interest_tags||[]).includes('large-private')},
+  {k:'rare',     label:'Rare widebody',m:e=>(e.interest_tags||[]).includes('widebody-rare')},
+  {k:'cargo',    label:'Cargo',      m:e=>e.category==='cargo'},
+];
+let CATOFF=new Set();
+function renderCatbar(){
+  const bar=$("#catbar"); if(!bar) return;
+  bar.innerHTML=CATGROUPS.map(g=>`<span class="catchip ${CATOFF.has(g.k)?'':'on'}" data-k="${g.k}">${g.label}</span>`).join('');
+  bar.querySelectorAll('.catchip').forEach(el=>el.onclick=()=>{
+    const k=el.dataset.k; if(CATOFF.has(k))CATOFF.delete(k); else CATOFF.add(k);
+    renderCatbar(); if(TAB==='board')loadBoard().then(loadPhotos);
+  });
+}
+function catVisible(e){ return !CATGROUPS.some(g=>CATOFF.has(g.k) && g.m(e)); }
 async function loadBoard(){
   const ap=$("#airport").value,hours=$("#hours").value,notable=$("#filter").value==="notable";
   const data=await j(`/api/board/${ap}?hours=${hours}&notable_only=${notable}`);
-  const red=data.events.filter(e=>e.priority==='red').length,blue=data.events.filter(e=>e.priority==='blue').length,blk=data.events.filter(e=>e.is_blocked).length;
-  $("#stat").innerHTML=`<div><b>${data.count}</b><span>events shown</span></div>
+  renderCatbar();
+  const events=data.events.filter(catVisible);
+  const red=events.filter(e=>e.priority==='red').length,blue=events.filter(e=>e.priority==='blue').length,blk=events.filter(e=>e.is_blocked).length;
+  $("#stat").innerHTML=`<div><b>${events.length}</b><span>events shown</span></div>
     <div><b style="color:var(--red)">${red}</b><span>high priority</span></div>
     <div><b style="color:var(--blue)">${blue}</b><span>low priority</span></div>
     <div><b style="color:var(--gold)">${blk}</b><span>blocked/notable frames</span></div>`;
-  $("#board").innerHTML=data.events.length?data.events.map(evRow).join(""):'<div class="empty">No matching traffic. Try “All traffic” or “Run cycle now”.</div>';
+  $("#board").innerHTML=events.length?events.map(evRow).join(""):'<div class="empty">No matching traffic. Try “All traffic”, adjust the filters above, or “Run cycle now”.</div>';
   loadWx(); loadFaBudget();
 }
 async function loadGuide(){
@@ -391,16 +426,20 @@ async function loadWx(){
     el.style.display='flex';
     const rwy=w.active_runway?`<span class="rwy">Rwy ${w.active_runway}</span>`:'';
     const cat=w.flight_category?`<span class="cat ${w.flight_category}">${w.flight_category}</span>`:'';
+    const mph=k=>Math.round((k||0)*1.15078);
+    const f=c=>Math.round(c*9/5+32);
     el.innerHTML=`${cat} <b>${ap}</b> ${rwy} `+
-      (w.wind_dir!=null?`· wind <b>${w.wind_dir}°</b> @ ${w.wind_kt||0}kt`+(w.wind_gust_kt?` G${w.wind_gust_kt}`:'')+' ':'')+
-      (w.temp_c!=null?`· ${w.temp_c}°C `:'')+
-      (w.visibility!=null?`· vis ${w.visibility} `:'')+
+      (w.wind_dir!=null?`· wind <b>${w.wind_dir}°</b> @ ${mph(w.wind_kt)} mph`+(w.wind_gust_kt?` G${mph(w.wind_gust_kt)}`:'')+' ':'')+
+      (w.temp_c!=null?`· ${f(w.temp_c)}°F `:'')+
+      (w.visibility!=null?`· vis ${w.visibility} mi `:'')+
       (w.clouds&&w.clouds.length?'· '+w.clouds.join(' '):'');
   }catch(e){el.style.display='none';}
 }
 async function loadAlerts(){
   const data=await j(`/api/alerts?airport=${$("#airport").value}&limit=200`);
-  $("#alerts").innerHTML=data.alerts.length?data.alerts.map(evRow).join(""):'<div class="empty">No alerts yet.</div>';
+  renderCatbar();
+  const al=(data.alerts||[]).filter(catVisible);
+  $("#alerts").innerHTML=al.length?al.map(evRow).join(""):'<div class="empty">No alerts match the current filters.</div>';
 }
 async function loadInbound(){
   const all=await j(`/api/alerts?limit=400`);
@@ -453,6 +492,15 @@ async function loadWatch(){
        <div class="sub">${w.label||''}</div></div>
      <button class="sm" onclick="delWatch(${w.id})">remove</button></div>`).join("");
   $("#watch").innerHTML=`
+   <div class="card"><h3>✈ Live flight tracker <span class="muted" style="font-weight:400">— follow a specific flight or tail anywhere in the world</span></h3>
+     <p class="muted" style="margin:6px 0 10px">Enter a flight number (e.g. <b>JX25</b>) or a tail (e.g. <b>B-58201</b>) and track it live worldwide via FlightAware — origin, destination, status and % complete.</p>
+     <div class="rowi">
+       <div style="flex:1;min-width:180px"><label class="f">Flight # or tail</label><input type="text" id="fl_id" placeholder="JX25"></div>
+       <button class="primary" id="fl_add">Track</button>
+       <button class="ghost" id="fl_refresh">Refresh live</button>
+     </div>
+     <div id="fl_list" style="margin-top:10px"></div>
+   </div>
    <div class="card"><h3>Watchlists <span class="muted" style="font-weight:400">— follow a tail, type, or category across a region</span></h3>
      <p class="muted" style="margin:6px 0 10px">“Alert me on ANY A380 in the Pacific NW”, or a single tail anywhere. A long-standing spotter request JetTip's airport-only model can't do.</p>
      <div class="rowi">
@@ -469,7 +517,36 @@ async function loadWatch(){
     const r=await j("/api/watchlists",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     $("#w_msg").textContent=r.ok?"Added.":"Error.";loadWatch();
   };
+  // live flight tracker (follow-a-tail)
+  const fa=$("#fl_add"); if(fa)fa.onclick=async()=>{
+    const id=$("#fl_id").value.trim(); if(!id)return;
+    await j("/api/follow",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ident:id})});
+    $("#fl_id").value=""; renderFollows(true);
+  };
+  const fr=$("#fl_refresh"); if(fr)fr.onclick=()=>renderFollows(true);
+  renderFollows(false);
 }
+async function renderFollows(live){
+  const box=$("#fl_list"); if(!box)return;
+  const f=await j("/api/follows"); const idents=f.follows||[];
+  if(!idents.length){box.innerHTML='<div class="muted" style="font-size:13px">Not tracking anything yet — add a flight above.</div>';return;}
+  let statuses={};
+  if(live){
+    box.innerHTML='<div class="muted" style="font-size:13px">Checking live positions…</div>';
+    const r=await j("/api/follow/check",{method:"POST"});
+    if(r&&r.flights)r.flights.forEach(x=>statuses[x.ident]=x);
+    if(r&&r.note){box.innerHTML='<div class="muted" style="font-size:13px">'+r.note+'</div>';return;}
+  }
+  box.innerHTML=idents.map(id=>{
+    const s=statuses[id];
+    const line=s?(s.status==='no active flight'?'no active flight right now'
+      :`${s.origin||'?'} → ${s.destination||'?'} · ${s.status||'en route'}${s.progress_percent!=null?(' · '+s.progress_percent+'% complete'):''}${s.type?(' · '+s.type):''}`):'tap “Refresh live” for status';
+    return `<div class="ev"><div class="main"><div class="l1"><b>${id}</b></div>
+      <div class="fl">${line}</div></div>
+      <button class="sm" onclick="unfollow('${id}')">stop</button></div>`;
+  }).join("");
+}
+async function unfollow(id){await j("/api/follow/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ident:id})});renderFollows(false);}
 async function delWatch(id){await fetch(`/api/watchlists/${encodeURIComponent(EMAIL)}/${id}`,{method:"DELETE"});loadWatch();}
 async function loadLog(){
   const d=await j(`/api/logbook/${encodeURIComponent(EMAIL)}`);const s=d.stats;
@@ -714,6 +791,7 @@ function switchTab(t){
     $("#"+id).style.display=(id===t)?(grid?"grid":"block"):"none";});
   $("#boardControls").style.display=(t==="board")?"flex":"none";
   $("#stat").style.display=(t==="board")?"flex":"none";
+  {const cb=$("#catbar");if(cb)cb.style.display=(["board","alerts","upcoming","inbound"].includes(t))?"flex":"none";}
   const lg=$("#legend");if(lg)lg.style.display=(t==="board")?"flex":"none";
   Promise.resolve(LOADERS[t]()).then(loadPhotos);
 }
