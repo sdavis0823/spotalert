@@ -173,9 +173,9 @@ def _code(d):
 
 def _parse_flight(f: dict) -> dict:
     return {
-        "ident": f.get("ident"),
-        "registration": f.get("registration"),
-        "type": f.get("aircraft_type"),
+        "ident": (f.get("ident") or "").strip() or None,
+        "registration": (f.get("registration") or "").strip() or None,
+        "type": (f.get("aircraft_type") or "").strip() or None,  # AeroAPI pads with spaces
         "origin": _code(f.get("origin")),
         "destination": _code(f.get("destination")),
         # arrival timing
@@ -358,9 +358,24 @@ def scan_airport_flights(airport_icao: str) -> dict:
     created = 0
     kinds = {"scheduled": 0, "enroute": 0, "departing": 0, "diversion": 0, "cancelled": 0}
 
+    # Wider look-ahead: page through scheduled arrivals across the horizon so we
+    # catch notable frames hours ahead, not just the immediate ~15 flights.
+    start = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+    end = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(horizon))
+    wide = src.scheduled_arrivals(airport_icao, max_pages=config.FA_SCHED_PAGES,
+                                  start=start, end=end)
+    seen_idents = set()
+    arrivals_all = []
+    for fl in wide + flights.get("scheduled_arrivals", []) + flights.get("arrivals", []):
+        k = fl.get("ident") or str(id(fl))
+        if k in seen_idents:
+            continue
+        seen_idents.add(k)
+        arrivals_all.append(fl)
+
     with db.get_conn() as conn:
         # --- arrivals side: pre-takeoff, enroute ETA, diversion, cancelled ---
-        for fl in flights.get("scheduled_arrivals", []) + flights.get("arrivals", []):
+        for fl in arrivals_all:
             ac = _notable_for_flight(fl)
             if not ac or not ac.get("icao24"):
                 continue

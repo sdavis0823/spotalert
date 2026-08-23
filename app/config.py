@@ -79,6 +79,9 @@ FA_AIRPORT_SCAN_INTERVAL_SEC = int(os.environ.get("FA_AIRPORT_SCAN_INTERVAL_SEC"
 # Free Starter tier allows only 5 queries/minute — throttle to stay under it so
 # we don't get 429 rate-limit errors when scanning several airports at once.
 FA_RATE_PER_MIN = int(os.environ.get("FA_RATE_PER_MIN", "5"))
+# How many pages (~15 flights each) of scheduled arrivals to page through for
+# look-ahead. More pages = further ahead but more queries. 4 ≈ several hours.
+FA_SCHED_PAGES = int(os.environ.get("FA_SCHED_PAGES", "4"))
 # HARD monthly cap on FlightAware queries — the app refuses to call AeroAPI once
 # this many have been made in the current calendar month, so you can NEVER be
 # pushed past the free tier into a paid overage. Set below the real 500 limit.
