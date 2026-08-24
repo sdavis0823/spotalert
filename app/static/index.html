@@ -291,6 +291,9 @@
   .wx .rfr:active{transform:scale(.9)}
   .wx .rfr.spin{animation:wxspin .6s linear infinite}
   @keyframes wxspin{to{transform:rotate(360deg)}}
+  .wx.flash{animation:wxflash 1s ease}
+  @keyframes wxflash{0%,60%{background:#eafaf2;border-color:#8fe0bb}100%{background:var(--surface)}}
+  .wx .rfr.ok{color:#0e9f66;border-color:#8fe0bb;background:#eafaf2}
 
   /* ============ JetTip-style board ============ */
   .jt-airport{display:flex;align-items:center;gap:14px;background:#c9d3dd;
@@ -790,7 +793,26 @@ async function loadWx(){
       `<button class="rfr" onclick="refreshWx(this)" title="Refresh weather &amp; status" aria-label="Refresh">↻</button>`;
   }catch(e){el.style.display='none';}
 }
-async function refreshWx(btn){ if(btn)btn.classList.add('spin'); await loadWx(); }
+async function refreshWx(btn){
+  const box=document.getElementById('wx');
+  if(btn)btn.classList.add('spin');
+  const t0=Date.now();
+  try{ await loadWx(); }
+  finally{
+    if(box){
+      // flash the whole box so the refresh is obvious even when the data is unchanged
+      box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+      const nb=box.querySelector('.rfr');
+      if(nb){
+        nb.classList.add('spin');
+        setTimeout(()=>{
+          nb.classList.remove('spin'); nb.classList.add('ok'); nb.textContent='✓';
+          setTimeout(()=>{ nb.classList.remove('ok'); nb.textContent='↻'; }, 900);
+        }, Math.max(0, 450-(Date.now()-t0)));
+      }
+    }
+  }
+}
 async function loadAlerts(){
   const data=await j(`/api/alerts?airport=${$("#airport").value}&limit=200`);
   renderCatbar();
