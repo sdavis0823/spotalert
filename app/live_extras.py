@@ -51,6 +51,46 @@ _tail_cache = {}          # callsign -> (timestamp, reg-or-None)
 _TAIL_TTL_HIT = 120       # a resolved tail is stable for a while
 _TAIL_TTL_MISS = 25       # a miss (not airborne yet) is retried sooner
 
+# A single wide /point/ snapshot answers FAST from any IP (that's how the board
+# scanner works), whereas per-/callsign/ queries are throttled to ~30s from
+# datacenter IPs. So we resolve tails from one cached bulk snapshot around the
+# home field and only fall back to the slow per-callsign lookup for a flight
+# that's outside the snapshot radius (e.g. still far offshore).
+_SNAP_CENTER = (33.4342, -112.0116)   # KPHX
+_SNAP_RADIUS = 250                    # nm (mirror max)
+_SNAP_TTL = 45
+_snap_cache = {"ts": 0.0, "map": {}}  # {CALLSIGN: REG}
+
+
+def _point_snapshot():
+    """callsign -> registration for everything airborne near the home field,
+    from one fast bulk /point/ query, cached briefly and shared across lookups."""
+    now = time.time()
+    if _snap_cache["map"] and now - _snap_cache["ts"] < _SNAP_TTL:
+        return _snap_cache["map"]
+    lat, lon = _SNAP_CENTER
+    for base in _ADSB_BASES:
+        try:
+            with httpx.Client(timeout=10, headers={"User-Agent": _TAIL_UA}) as c:
+                r = c.get(f"{base}/point/{lat}/{lon}/{_SNAP_RADIUS}")
+                if r.status_code != 200:
+                    continue
+                acs = r.json().get("ac") or []
+        except (httpx.HTTPError, ValueError):
+            continue
+        if not acs:
+            continue
+        m = {}
+        for a in acs:
+            cs = (a.get("flight") or "").strip().upper()
+            reg = (a.get("r") or "").strip().upper()
+            if cs and reg:
+                m[cs] = reg
+        if m:
+            _snap_cache.update(ts=now, map=m)
+            return m
+    return _snap_cache["map"]  # stale is better than nothing
+
 
 def _tail_from_base(base, cs):
     """Query one ADS-B mirror for a callsign; return its registration or None."""
@@ -83,7 +123,12 @@ def tail_for_flight(ident):
     hit = _tail_cache.get(cs)
     if hit and time.time() - hit[0] < (_TAIL_TTL_HIT if hit[1] else _TAIL_TTL_MISS):
         return hit[1]
-    reg = None
+    # Fast path: the shared bulk snapshot (one quick call, cached).
+    reg = _point_snapshot().get(cs)
+    if reg:
+        _tail_cache[cs] = (time.time(), reg)
+        return reg
+    # Slow path: per-callsign lookup for a flight outside the snapshot radius.
     with ThreadPoolExecutor(max_workers=len(_ADSB_BASES)) as ex:
         futs = [ex.submit(_tail_from_base, b, cs) for b in _ADSB_BASES]
         for f in as_completed(futs):
