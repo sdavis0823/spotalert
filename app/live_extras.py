@@ -58,11 +58,16 @@ _snap_cache = {"ts": 0.0, "map": {}}  # {CALLSIGN: REG}; last good snapshot kept
 
 
 def _fetch_snapshot_map():
-    """One bulk /point/ query around the home field -> {CALLSIGN: REG}, or {}."""
+    """One bulk /point/ query around the home field -> {CALLSIGN: REG}, or {}.
+
+    This runs only in the background (scheduler), never on a user request, so it
+    can afford a generous timeout: when a mirror throttles a datacenter IP it
+    often still answers, just slowly — a long timeout catches that instead of
+    giving up and leaving the snapshot empty."""
     lat, lon = _SNAP_CENTER
     for base in _ADSB_BASES:
         try:
-            with httpx.Client(timeout=12, headers={"User-Agent": _TAIL_UA}) as c:
+            with httpx.Client(timeout=40, headers={"User-Agent": _TAIL_UA}) as c:
                 r = c.get(f"{base}/point/{lat}/{lon}/{_SNAP_RADIUS}")
                 if r.status_code != 200:
                     continue
