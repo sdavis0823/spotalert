@@ -62,6 +62,20 @@ def public_key() -> str:
     return _KEYS["public"]
 
 
+def generate_pair() -> dict:
+    """Generate a fresh VAPID keypair for the user to set as stable env vars
+    (so push subscriptions survive restarts). Returns public + private PEM."""
+    priv = ec.generate_private_key(ec.SECP256R1())
+    pub = priv.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    return {
+        "VAPID_PUBLIC_KEY": _b64(pub),
+        "VAPID_PRIVATE_KEY": priv.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption()).decode(),
+    }
+
+
 def status() -> dict:
     _ensure_keys()
     return {

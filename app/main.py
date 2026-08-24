@@ -574,6 +574,67 @@ def flightaware_scan(background: BackgroundTasks, airport: str | None = None, de
             "budget_remaining": fa_mod.budget_remaining()}
 
 
+@app.get("/api/push/generate-keys")
+def push_generate_keys():
+    """One-time helper: make a stable VAPID keypair to paste into your host's
+    env (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY) so push survives restarts."""
+    k = push.generate_pair()
+    return {"ok": True, **k, "VAPID_SUBJECT": "mailto:alerts@spotalert.local",
+            "how": "Add these three as environment variables on Render, then redeploy. "
+                   "Keep the private key secret."}
+
+
+@app.get("/api/liveries/digest")
+def liveries_digest(airport: str = "KPHX", email: str = "spotter@example.com",
+                    hours: int = 36, push_it: bool = True):
+    """Morning digest: load the day's schedule (free) and push a summary of the
+    special liveries coming into the airport in the next `hours`. Meant to be hit
+    once each morning by a free external timer (which also wakes the server)."""
+    icao = airport.upper()
+    if adb_mod.available():
+        try:
+            adb_mod.load(icao, max(hours, 36))
+        except Exception:  # noqa: BLE001
+            pass
+    now = int(time.time())
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM scheduled_flights WHERE airport_icao=?
+                 AND event_time > ? AND event_time < ? AND notable=1
+               ORDER BY event_time ASC""",
+            (icao, now, now + hours * 3600)).fetchall()
+    seen, liveries_list = set(), []
+    for r in rows:
+        tags = (r["tags"] or "")
+        is_livery = (r["category"] == "special") or bool(re.search(r"livery|retro|heritage", tags, re.I))
+        if not is_livery:
+            continue
+        key = (r["registration"] or r["ident"] or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        nm = next((t for t in tags.split(",") if t and t not in
+                   ("special-livery", "special", "retro", "heritage")), None)
+        pretty = (nm or "").replace("-", " ").title() or (r["operator"] or r["ident"] or "special")
+        liveries_list.append(pretty)
+    code = icao[1:] if len(icao) == 4 and icao[0] == "K" else icao
+    if liveries_list:
+        n = len(liveries_list)
+        title = f"✦ {n} special liver{'y' if n == 1 else 'ies'} into {code}"
+        body = ", ".join(liveries_list[:6]) + ("…" if n > 6 else "")
+    else:
+        title = f"No special liveries into {code} today"
+        body = "Nothing special scheduled in the next day."
+    result = {"ok": True, "airport": icao, "count": len(liveries_list),
+              "liveries": liveries_list}
+    if push_it:
+        st, detail = push.send(email, title, body, url="/")
+        result["push"] = {"status": st, "detail": detail, "title": title, "body": body}
+    else:
+        result["preview"] = {"title": title, "body": body}
+    return result
+
+
 @app.get("/api/flight/detail")
 def flight_detail(ident: str):
     """Tap-a-plane detail card: aircraft photo, model, gate, live status, route."""
