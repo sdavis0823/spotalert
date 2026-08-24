@@ -251,7 +251,7 @@ def _store_scheduled_board(conn, airport_icao, arrivals, departures, now, horizo
         reg = fl.get("registration")
         ident = fl.get("ident")
         notable = 1 if ac and ac.get("icao24") else 0
-        operator = (ac.get("operator") if ac else None) or _airline_from_ident(ident)
+        operator = (ac.get("operator") if ac else None) or fl.get("operator") or _airline_from_ident(ident)
         icao24 = (ac.get("icao24") if ac else None) or (reg or ident or "").lower() or None
         cat = ac.get("category") if ac else None
         tags = ",".join(ac.get("interest_tags") or []) if ac else None

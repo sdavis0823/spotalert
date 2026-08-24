@@ -21,6 +21,7 @@ from pydantic import BaseModel, EmailStr
 from . import db, config, aircraft as ac_mod, engine
 from . import sources, notify, scheduler, eta as eta_mod, watchlist, logbook, photos, push, liveries
 from . import flightaware as fa_mod
+from . import aerodatabox as adb_mod
 from . import airports_catalog as catalog
 from . import live_extras
 from . import type_art
@@ -569,6 +570,37 @@ def flightaware_scan(background: BackgroundTasks, airport: str | None = None, de
 def flightaware_scan_status():
     """Progress of a background deep scan (for the UI's 'filling in…' state)."""
     return {**fa_mod.deep_status(), "budget_remaining": fa_mod.budget_remaining()}
+
+
+@app.post("/api/schedule/load")
+def schedule_load(background: BackgroundTasks, airport: str, hours: int = 72):
+    """Load the full multi-day board for one airport. Prefers AeroDataBox (free,
+    generous quota) so it never burns the FlightAware budget; falls back to a
+    FlightAware deep scan only if no AeroDataBox key is configured."""
+    icao = airport.upper()
+    if adb_mod.available():
+        r = adb_mod.load(icao, hours)      # fast + free (~1 call per 12h window)
+        try:
+            notify.dispatch_new()
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": True, "source": "aerodatabox", "async": False,
+                "stored": r.get("stored", 0), "arrivals": r.get("arrivals", 0),
+                "departures": r.get("departures", 0), "error": r.get("error")}
+    # fallback: FlightAware deep scan in the background
+    src = fa_mod.FlightAwareSource()
+    if not src.available():
+        return {"ok": False, "source": "none",
+                "note": "No schedule source configured. Add an AeroDataBox key (free) "
+                        "or a FlightAware key to load the day's board."}
+    if not src.budget_ok():
+        return {"ok": False, "source": "flightaware", "async": False,
+                "note": "FlightAware monthly free budget reached — add a free AeroDataBox "
+                        "key to keep loading the board (no charge), or wait for the reset."}
+    if not fa_mod.deep_status().get("running"):
+        background.add_task(_deep_scan_job, [icao])
+    return {"ok": True, "source": "flightaware", "async": True,
+            "note": "Loading via FlightAware in the background (paced to the free 5/min limit)."}
 
 
 @app.get("/api/flightaware/debug/{icao}")

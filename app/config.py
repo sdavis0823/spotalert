@@ -97,6 +97,18 @@ FA_SEARCH_ENABLED = os.environ.get("FA_SEARCH_ENABLED", "0") == "1"
 # Follow-a-tail global tracking cadence.
 FA_FOLLOW_SCAN_INTERVAL_SEC = int(os.environ.get("FA_FOLLOW_SCAN_INTERVAL_SEC", "1800"))
 
+# --- AeroDataBox (free-tier full schedule board) --------------------------
+# A generous free tier (~600 calls/month) that returns the WHOLE day's airport
+# schedule — every arrival & departure with flight number, airline, aircraft
+# type, route and times. A full day is ~6 calls, so ~150 full-day loads/month:
+# the board never runs out. Registration (needed to flag special liveries) is
+# included only when AeroDataBox has it (mostly closer to departure), so
+# day-ahead livery flagging still leans on FlightAware. Sign up on RapidAPI,
+# subscribe to AeroDataBox (Basic = free), and set AERODATABOX_API_KEY.
+ADB_API_KEY = os.environ.get("AERODATABOX_API_KEY", "").strip()
+ADB_HOST = os.environ.get("AERODATABOX_HOST", "aerodatabox.p.rapidapi.com")
+ADB_BASE = os.environ.get("AERODATABOX_BASE", "https://aerodatabox.p.rapidapi.com")
+
 # --- Free live-feed extras (no key needed) --------------------------------
 # Emergency squawk watch (7500 hijack / 7600 radio-fail / 7700 general).
 EMERGENCY_SQUAWK_ENABLED = os.environ.get("EMERGENCY_SQUAWK_ENABLED", "1") == "1"
