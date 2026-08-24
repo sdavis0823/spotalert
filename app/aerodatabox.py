@@ -132,6 +132,49 @@ def fetch_schedule(icao: str, hours: int = 72):
     return arrivals, departures
 
 
+def flight_detail(ident: str) -> dict | None:
+    """One-call detail for a flight number: aircraft reg/model + photo, gate/
+    terminal, live status, route and times. Powers the tap-a-plane card."""
+    if not ident:
+        return None
+    data = _get(f"/flights/number/{ident}",
+                {"withAircraftImage": "true", "withLocation": "false",
+                 "dateLocalRole": "Both"})
+    if not data:
+        return None
+    fl = data[0] if isinstance(data, list) and data else (data if isinstance(data, dict) else None)
+    if not fl:
+        return None
+    ac = fl.get("aircraft") or {}
+    al = fl.get("airline") or {}
+    dep = fl.get("departure") or {}
+    arr = fl.get("arrival") or {}
+    img = (ac.get("image") or {})
+
+    def _apt(m):
+        a = (m.get("airport") or {})
+        return a.get("iata") or a.get("icao") or a.get("shortName") or a.get("name")
+
+    def _t(m):
+        s = (m.get("scheduledTime") or {})
+        return s.get("local") or s.get("utc")
+    return {
+        "ident": fl.get("number") or ident,
+        "airline": al.get("name"),
+        "status": fl.get("status"),
+        "registration": ac.get("reg"),
+        "model": ac.get("model"),
+        "image_url": img.get("url"),
+        "image_credit": (img.get("author") or ""),
+        "image_link": img.get("webUrl") or img.get("link"),
+        "origin": _apt(dep), "destination": _apt(arr),
+        "dep_terminal": dep.get("terminal"), "dep_gate": dep.get("gate"),
+        "arr_terminal": arr.get("terminal"), "arr_gate": arr.get("gate"),
+        "dep_time": _t(dep), "arr_time": _t(arr),
+        "error": _LAST_ERROR,
+    }
+
+
 def load(icao: str, hours: int = 72) -> dict:
     """Fetch the full schedule and store it into scheduled_flights (the board
     cache). Returns counts. Cheap on the free tier (~1 call per 12h window)."""

@@ -574,6 +574,16 @@ def flightaware_scan(background: BackgroundTasks, airport: str | None = None, de
             "budget_remaining": fa_mod.budget_remaining()}
 
 
+@app.get("/api/flight/detail")
+def flight_detail(ident: str):
+    """Tap-a-plane detail card: aircraft photo, model, gate, live status, route."""
+    if adb_mod.available():
+        d = adb_mod.flight_detail(ident)
+        if d:
+            return {"ok": True, **d}
+    return {"ok": False, "note": "No live detail available for this flight yet."}
+
+
 @app.get("/api/flightaware/scan/status")
 def flightaware_scan_status():
     """Progress of a background deep scan (for the UI's 'filling in…' state)."""
