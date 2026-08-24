@@ -701,6 +701,28 @@ def photo_debug(reg: str):
     return {"reg": reg.upper(), "result": result, "diag": photos.LAST_DIAG}
 
 
+@app.get("/api/photo-by-reg")
+def photo_by_reg(reg: str = "", type: str = ""):
+    """Photo for a known tail number, independent of the AeroDataBox flight
+    lookup (which the board already gave us the reg from, and which is flaky on
+    the free tier). Real Planespotters photo if available, else the type
+    illustration slug so the card still shows a clean plane."""
+    slug = type_art.resolve(None, type) if type else None
+    pic = None
+    if reg:
+        try:
+            pic = photos.get_photo("", reg.upper())
+        except Exception:  # noqa: BLE001
+            pic = None
+    if pic and (pic.get("thumbnail_large") or pic.get("thumbnail")):
+        return {"image_url": pic.get("thumbnail_large") or pic.get("thumbnail"),
+                "image_credit": pic.get("photographer") or pic.get("credit"),
+                "image_link": pic.get("link"), "image_is_art": False, "type_art": slug}
+    return {"image_url": f"/static/types/{slug}.png" if slug else None,
+            "image_credit": None, "image_link": None,
+            "image_is_art": bool(slug), "type_art": slug}
+
+
 @app.get("/api/diag/psprobe")
 def photo_probe(reg: str = "N944WN"):
     """Bulletproof, self-contained probe: hit Planespotters directly from THIS
