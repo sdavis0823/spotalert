@@ -684,6 +684,14 @@ def flight_detail(ident: str):
     return {"ok": False, "note": "No live detail available for this flight yet."}
 
 
+@app.get("/api/photo/debug")
+def photo_debug(reg: str):
+    """Diagnostic: what does the Planespotters fetch return from THIS server?"""
+    photos._cache.clear()
+    result = photos.get_photo("", reg.upper())
+    return {"reg": reg.upper(), "result": result, "diag": photos.LAST_DIAG}
+
+
 @app.get("/api/flightaware/scan/status")
 def flightaware_scan_status():
     """Progress of a background deep scan (for the UI's 'filling in…' state)."""

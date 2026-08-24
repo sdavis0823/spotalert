@@ -25,8 +25,25 @@ PS_BASE = "https://api.planespotters.net/pub/photos"
 AD_BASE = "https://airport-data.com/api/ac_thumb.json"
 
 
+# Last diagnostic (for /api/photo/debug) — what the most recent PS call did.
+LAST_DIAG = {}
+
+
 # ---------------------------------------------------------------- providers
 def _planespotters(client, icao24, registration):
+    def fetch(url):
+        r = client.get(url)
+        LAST_DIAG["url"] = url
+        LAST_DIAG["status"] = r.status_code
+        LAST_DIAG["body"] = (r.text or "")[:200]
+        if r.status_code != 200:
+            return None
+        try:
+            return r.json()
+        except ValueError:
+            LAST_DIAG["parse_error"] = True
+            return None
+
     def parse(payload):
         photos = (payload or {}).get("photos") or []
         if not photos:
@@ -41,11 +58,11 @@ def _planespotters(client, icao24, registration):
             "source": "planespotters",
         }
     if icao24:
-        r = parse(client.get(f"{PS_BASE}/hex/{icao24}").json())
+        r = parse(fetch(f"{PS_BASE}/hex/{icao24}"))
         if r:
             return r
     if registration:
-        return parse(client.get(f"{PS_BASE}/reg/{registration}").json())
+        return parse(fetch(f"{PS_BASE}/reg/{registration}"))
     return None
 
 
@@ -94,7 +111,10 @@ def get_photo(icao24: str, registration: str | None = None) -> dict | None:
         return hit[1]
 
     result = None
-    with httpx.Client(timeout=12, headers={"User-Agent": "SpotAlert/1.0"}) as client:
+    _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+    with httpx.Client(timeout=12, follow_redirects=True,
+                      headers={"User-Agent": _UA, "Accept": "application/json"}) as client:
         for provider in PROVIDERS:
             try:
                 result = provider(client, icao24, registration)
