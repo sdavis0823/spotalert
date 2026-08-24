@@ -66,7 +66,7 @@ FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY", "").strip()
 FLIGHTAWARE_BASE = os.environ.get("FLIGHTAWARE_BASE", "https://aeroapi.flightaware.com/aeroapi")
 # How far ahead to watch scheduled arrivals (hours). Airlines load schedules a
 # day+ out; filed GA/military plans usually same-day.
-SCHEDULED_LOOKAHEAD_HOURS = int(os.environ.get("SCHEDULED_LOOKAHEAD_HOURS", "36"))
+SCHEDULED_LOOKAHEAD_HOURS = int(os.environ.get("SCHEDULED_LOOKAHEAD_HOURS", "72"))
 # The scheduled scan is the paid call — run it less often than the live loop.
 SCHEDULED_SCAN_INTERVAL_SEC = int(os.environ.get("SCHEDULED_SCAN_INTERVAL_SEC", "1800"))
 
@@ -85,7 +85,7 @@ FA_SCHED_PAGES = int(os.environ.get("FA_SCHED_PAGES", "5"))
 # "Deep scan" (manual, on-demand) — pages a full next-day window so no special
 # livery scheduled tomorrow is missed. Costs more queries, but user-triggered
 # and still guarded by the hard monthly cap, so it can never cause a charge.
-FA_DEEP_PAGES = int(os.environ.get("FA_DEEP_PAGES", "34"))
+FA_DEEP_PAGES = int(os.environ.get("FA_DEEP_PAGES", "48"))
 # Weekly auto-refresh of the community notable-aircraft registry (free source).
 REGISTRY_REFRESH_INTERVAL_SEC = int(os.environ.get("REGISTRY_REFRESH_INTERVAL_SEC", "604800"))
 # HARD monthly cap on FlightAware queries — the app refuses to call AeroAPI once
