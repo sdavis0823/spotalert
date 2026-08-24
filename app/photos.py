@@ -116,8 +116,10 @@ def get_photo(icao24: str, registration: str | None = None) -> dict | None:
         return hit[1]
 
     result = None
-    _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-           "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+    # Planespotters REQUIRES a server User-Agent with a contact URL/email, else
+    # it 403s ("must include a contact URL or email"). This is the exact format
+    # their API error message asks for.
+    _UA = "SpotAlert/1.0 (+https://spotalert.onrender.com)"
     with httpx.Client(timeout=12, follow_redirects=True,
                       headers={"User-Agent": _UA, "Accept": "application/json"}) as client:
         for provider in PROVIDERS:
