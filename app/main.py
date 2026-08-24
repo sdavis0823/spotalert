@@ -701,7 +701,7 @@ def photo_debug(reg: str):
     return {"reg": reg.upper(), "result": result, "diag": photos.LAST_DIAG}
 
 
-@app.get("/api/photo/probe")
+@app.get("/api/diag/psprobe")
 def photo_probe(reg: str = "N944WN"):
     """Bulletproof, self-contained probe: hit Planespotters directly from THIS
     server and report the raw HTTP status / body / exception, no layering."""
