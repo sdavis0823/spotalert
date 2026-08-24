@@ -1020,8 +1020,7 @@ async function init(){
     const r=await j(`/api/flightaware/scan?airport=${$("#airport").value}`,{method:"POST"});
     fs.textContent="✈ Scan FlightAware";fs.disabled=false;
     if(!r.ok){alert(r.note||"FlightAware scan unavailable.");}
-    else{alert(`FlightAware scan done.\nNew alerts: ${r.new_alerts}\nQueries left this month: ${r.budget_remaining}`);}
-    loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
+    loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);   // silent refresh, no popup
   };
   const fd=$("#faDeep");
   if(fd)fd.onclick=async()=>{
@@ -1039,9 +1038,9 @@ async function init(){
         fd.textContent=`Deep scanning… (${s.new_alerts||0} special so far)`;
         if(TAB==="board")loadBoard().then(loadPhotos);
       }else{
-        clearInterval(poll); fd.disabled=false; fd.textContent="🔎 Deep scan (full day)";
-        loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
-        alert(`Deep scan finished.\nSpecial/notable aircraft found: ${s.new_alerts||0}\nQueries left this month: ${s.budget_remaining}`);
+        clearInterval(poll); fd.disabled=false; fd.textContent="✓ Full day loaded";
+        setTimeout(()=>{fd.textContent="🔎 Deep scan (full day)";},4000);
+        loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);   // silent — board shows the result
       }
       if(ticks>60){clearInterval(poll); fd.disabled=false; fd.textContent="🔎 Deep scan (full day)";}
     },5000);
@@ -1050,8 +1049,22 @@ async function init(){
   loadScheduler();setInterval(loadScheduler,15000);
   loadFaBudget();
   switchTab("board");
+  autoFill();   // JetTip-style: fill the board on open, no button needed
   // register the service worker so SpotAlert is installable as an app (PWA)
   if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
+}
+// JetTip-style auto-fill: when the board opens empty, quietly pull today's
+// flights so the user never has to press a scan button. Only scans when there's
+// nothing cached to show, so it doesn't waste FlightAware queries.
+async function autoFill(){
+  try{
+    const ap=$("#airport").value; if(!ap) return;
+    const d=await j(`/api/board/${ap}?hours=24&notable_only=false`);
+    if((d.count||0)>0) return;                 // already have flights — just show them
+    const u=await j('/api/flightaware/usage'); if(!u.enabled||u.remaining<=0) return;
+    await j(`/api/flightaware/scan?airport=${ap}`,{method:"POST"});   // quick, silent
+    loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
+  }catch(e){}
 }
 init();
 </script>
