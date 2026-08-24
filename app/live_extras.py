@@ -6,7 +6,9 @@ Three spotter features built on data that costs nothing:
   * airport weather + likely active runway, from aviationweather.gov METAR.
 """
 import re
+import time
 import httpx
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from . import sources, config, aircraft as ac_mod
 
 # IATA flight-number prefix -> ICAO callsign prefix, so we can turn a schedule
@@ -44,29 +46,53 @@ _ADSB_BASES = [
 ]
 
 
+_TAIL_UA = "SpotAlert/1.0 (+https://spotalert.onrender.com)"
+_tail_cache = {}          # callsign -> (timestamp, reg-or-None)
+_TAIL_TTL_HIT = 120       # a resolved tail is stable for a while
+_TAIL_TTL_MISS = 25       # a miss (not airborne yet) is retried sooner
+
+
+def _tail_from_base(base, cs):
+    """Query one ADS-B mirror for a callsign; return its registration or None."""
+    try:
+        with httpx.Client(timeout=6, headers={"User-Agent": _TAIL_UA}) as c:
+            r = c.get(f"{base}/callsign/{cs}")
+            if r.status_code != 200:
+                return None
+            for a in (r.json().get("ac") or []):
+                reg = (a.get("r") or "").strip().upper()
+                if reg:
+                    return reg
+    except (httpx.HTTPError, ValueError):
+        return None
+    return None
+
+
 def tail_for_flight(ident):
     """Registration of the aircraft currently flying under this flight number,
     from a free ADS-B feed. Works whenever the plane is AIRBORNE (most long-haul
     intl arrivals already are), even before it lands. None if the plane isn't
-    broadcasting yet or the callsign can't be mapped."""
+    broadcasting yet or the callsign can't be mapped.
+
+    The mirrors are queried CONCURRENTLY (first answer wins) so a slow or
+    rate-limiting mirror can't stall the request, and results are cached briefly
+    so opening the same card twice is instant."""
     cs = _ident_to_callsign(ident)
     if not cs:
         return None
-    with httpx.Client(timeout=8, headers={
-            "User-Agent": "SpotAlert/1.0 (+https://spotalert.onrender.com)"}) as c:
-        for base in _ADSB_BASES:
-            try:
-                r = c.get(f"{base}/callsign/{cs}")
-                if r.status_code != 200:
-                    continue
-                data = r.json()
-            except (httpx.HTTPError, ValueError):
-                continue
-            for a in (data.get("ac") or []):
-                reg = (a.get("r") or "").strip().upper()
-                if reg:
-                    return reg
-    return None
+    hit = _tail_cache.get(cs)
+    if hit and time.time() - hit[0] < (_TAIL_TTL_HIT if hit[1] else _TAIL_TTL_MISS):
+        return hit[1]
+    reg = None
+    with ThreadPoolExecutor(max_workers=len(_ADSB_BASES)) as ex:
+        futs = [ex.submit(_tail_from_base, b, cs) for b in _ADSB_BASES]
+        for f in as_completed(futs):
+            r = f.result()
+            if r:
+                reg = r
+                break
+    _tail_cache[cs] = (time.time(), reg)
+    return reg
 
 
 # Emergency transponder codes and what they mean.
