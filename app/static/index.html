@@ -284,6 +284,13 @@
   .wx .dly.ontime{background:#eafaf2;color:#0e9f66}
   .wx .dly.minor{background:#fff6e5;color:#b26a00}
   .wx .dly.major{background:#fdeef0;color:#c81e2a}
+  .wx .rfr{margin-left:auto;flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--line2);
+    background:var(--surface2);color:var(--muted);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;
+    align-items:center;justify-content:center;transition:background .15s,color .15s,transform .15s}
+  .wx .rfr:hover{background:var(--surface);color:var(--ink)}
+  .wx .rfr:active{transform:scale(.9)}
+  .wx .rfr.spin{animation:wxspin .6s linear infinite}
+  @keyframes wxspin{to{transform:rotate(360deg)}}
 
   /* ============ JetTip-style board ============ */
   .jt-airport{display:flex;align-items:center;gap:14px;background:#c9d3dd;
@@ -664,10 +671,10 @@ function rowTap(ev,el){
   openFlightDetail(el.dataset);
 }
 function closeFl(){$("#flModal").classList.remove("on");}
-async function loadFlightPhoto(reg,type){
+async function loadFlightPhoto(reg,type,ident){
   const box=$("#flContent"); const ph=box&&box.querySelector('.fl-photo'); if(!ph)return;
   let d;
-  try{ d=await j('/api/photo-by-reg?reg='+encodeURIComponent(reg||'')+'&type='+encodeURIComponent(type||'')); }
+  try{ d=await j('/api/photo-by-reg?reg='+encodeURIComponent(reg||'')+'&type='+encodeURIComponent(type||'')+'&ident='+encodeURIComponent(ident||'')); }
   catch(e){ ph.textContent='No image for this aircraft'; return; }
   if(!d||!d.image_url){ ph.textContent='No image for this aircraft'; return; }
   const img=new Image(); img.className='fl-photo'+(d.image_is_art?' art':''); img.alt='aircraft';
@@ -715,7 +722,7 @@ async function openFlightDetail(ds){
     (ds.ident?`<a class="alt" href="https://flightaware.com/live/flight/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">FlightAware</a>`:'');
   // Photo loads from the tail number the board already gave us — independent of
   // the (flaky, rate-limited) AeroDataBox flight lookup, so it shows reliably.
-  loadFlightPhoto(ds.reg, ds.type);
+  loadFlightPhoto(ds.reg, ds.type, ds.ident);
   if(!ds.ident)return;
   try{
     const d=await j('/api/flight/detail?ident='+encodeURIComponent(ds.ident));
@@ -779,9 +786,11 @@ async function loadWx(){
       (w.wind_dir!=null?`· wind <b>${w.wind_dir}°</b> @ ${mph(w.wind_kt)} mph`+(w.wind_gust_kt?` G${mph(w.wind_gust_kt)}`:'')+' ':'')+
       (w.temp_c!=null?`· ${f(w.temp_c)}°F `:'')+
       (w.visibility!=null?`· vis ${w.visibility} mi `:'')+
-      (w.clouds&&w.clouds.length?'· '+w.clouds.join(' '):'');
+      (w.clouds&&w.clouds.length?'· '+w.clouds.join(' '):'')+
+      `<button class="rfr" onclick="refreshWx(this)" title="Refresh weather &amp; status" aria-label="Refresh">↻</button>`;
   }catch(e){el.style.display='none';}
 }
+async function refreshWx(btn){ if(btn)btn.classList.add('spin'); await loadWx(); }
 async function loadAlerts(){
   const data=await j(`/api/alerts?airport=${$("#airport").value}&limit=200`);
   renderCatbar();
