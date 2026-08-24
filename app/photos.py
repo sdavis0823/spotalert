@@ -73,7 +73,11 @@ def _airport_data(client, icao24, registration):
     return None
 
 
-PROVIDERS = [_planespotters, _airport_data]
+# Planespotters serves ~420px photos that fill the card cleanly. airport-data
+# only serves 150px thumbnails that look blurry blown up, so it's not used for
+# the card (a Planespotters miss falls back to AeroDataBox's image, then to a
+# crisp type illustration via the frontend's resolution gate).
+PROVIDERS = [_planespotters]
 
 
 # ---------------------------------------------------------------- public API
