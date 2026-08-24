@@ -533,6 +533,8 @@ function evIsHeavy(e){return HEAVY_RE.test((e.type||'').toUpperCase());}
 function evIsBiz(e){const T=(e.type||'').toUpperCase();return BIZ_RE.test(T)||e.category==='private'||(e.interest_tags||[]).includes('large-private');}
 function evIsSpecial(e){return e.category==='special'||(e.interest_tags||[]).some(t=>/livery|retro|heritage/i.test(t));}
 function evIsIntl(e){const op=(e.operator||'').toLowerCase();return !!op&&!US_CARRIERS.some(u=>op.includes(u));}
+const CARGO_RE=/fedex|ups|\bups\b|united parcel|abx|atlas air|kalitta|cargolux|\bdhl\b|amerijet|western global|nippon cargo|polar air|astar|prime air|amazon|mountain air cargo|empire air|ameriflight|cargojet|\bcargo\b|freight|swiftair|sky lease|21 air|national air/i;
+function evIsCargo(e){return e.category==='cargo'||CARGO_RE.test(e.operator||'');}
 // standout: the aircraft a spotter chases. common-notable: also worth a look.
 function evHigh(e){return evIsSpecial(e)||evIsHeavy(e)||evIsBiz(e)||['military','gov','warbird','tanker'].includes(e.category)||e.direction==='diversion';}
 function evNotable(e){return evHigh(e)||evIsIntl(e)||e.category==='cargo';}
@@ -561,8 +563,8 @@ function catVisible(e){
   if(JTF.direction==='departure'&&!dep)return false;
   if(JTF.hub==='hide'){const hubs=HUBS[$("#airport").value]||[];const op=(e.operator||'').toLowerCase();
     if(op&&hubs.some(h=>op.includes(h)))return false;}
-  if(JTF.config==='cargo'&&e.category!=='cargo')return false;
-  if(JTF.config==='pax'&&e.category==='cargo')return false;
+  if(JTF.config==='cargo'&&!evIsCargo(e))return false;
+  if(JTF.config==='pax'&&evIsCargo(e))return false;
   if(JTF.livery==='special'&&!(e.category==='special'||(e.interest_tags||[]).some(t=>/livery|retro|heritage/i.test(t))))return false;
   if(JTF.notoriety==='divert'&&e.direction!=='diversion')return false;
   if(JTF.notoriety==='heavy'&&!/A380|A350|A340|A330|A300|A310|747|777|767|787|A35|A34|A33|A38|B74|B76|B77|B78|MD11|MD-11|DC10|DC-10|ILYUSHIN|ANTONOV/i.test(T))return false;
