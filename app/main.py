@@ -646,7 +646,16 @@ def flight_detail(ident: str):
             # illustration of the aircraft TYPE so every card shows a plane.
             slug = type_art.resolve(None, d.get("model"))
             d["type_art"] = slug
-            if not d.get("image_url") and slug:
+            # AeroDataBox's photo is the ACTUAL airframe only when a tail number
+            # is known. Without a reg its "photo" can be any operator's example of
+            # the type (e.g. a WOW Air jet for an American flight) — misleading.
+            # So when there's no reg, show a labeled type illustration instead.
+            if not d.get("registration"):
+                d["image_url"] = f"/types/{slug}.png" if slug else None
+                d["image_credit"] = None
+                d["image_link"] = None
+                d["image_is_art"] = bool(slug)
+            elif not d.get("image_url") and slug:
                 d["image_url"] = f"/types/{slug}.png"
                 d["image_is_art"] = True
             return {"ok": True, **d}
