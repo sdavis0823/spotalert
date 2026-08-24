@@ -102,8 +102,18 @@ def _fetch_snapshot():
 
 def warm_snapshot():
     """Force-refresh the snapshot (called from the background scheduler so a
-    user never pays the ~30s build). Safe to call often; no-op on empty fetch."""
-    ac = _fetch_snapshot()
+    user never pays the ~30s build). Safe to call often; no-op on empty fetch.
+
+    The free mirrors rate-limit in bursts, so a single wide call can come back
+    empty even when the feed is up (a smaller call seconds later succeeds). Since
+    this runs in the background, we retry a few times with a short pause until we
+    get data, rather than leaving the snapshot empty for a whole 5-minute cycle."""
+    ac = []
+    for attempt in range(4):
+        ac = _fetch_snapshot()
+        if ac:
+            break
+        time.sleep(4)
     if ac:
         m = {}
         for a in ac:
