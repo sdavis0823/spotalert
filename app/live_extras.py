@@ -54,11 +54,14 @@ _TAIL_UA = "SpotAlert/1.0 (+https://spotalert.onrender.com)"
 # lookups instant AND stops user traffic from ever tripping the feed's rate limit.
 _SNAP_CENTER = (33.4342, -112.0116)   # KPHX
 _SNAP_RADIUS = 250                    # nm (mirror max)
-_snap_cache = {"ts": 0.0, "map": {}}  # {CALLSIGN: REG}; last good snapshot kept
+# Last good snapshot: `map` is {CALLSIGN: REG} for the tail lookup, `ac` is the
+# full list of normalized aircraft (with positions) for the live radar scope.
+_snap_cache = {"ts": 0.0, "map": {}, "ac": []}
 
 
-def _fetch_snapshot_map():
-    """One bulk /point/ query around the home field -> {CALLSIGN: REG}, or {}.
+def _fetch_snapshot():
+    """One bulk /point/ query around the home field -> list of normalized
+    aircraft dicts (icao24/callsign/reg/type/alt/gs/lat/lon/track/...), or [].
 
     This runs only in the background (scheduler), never on a user request, so it
     can afford a generous timeout: when a mirror throttles a datacenter IP it
@@ -76,24 +79,46 @@ def _fetch_snapshot_map():
             continue
         if not acs:
             continue
-        m = {}
+        out = []
         for a in acs:
-            cs = (a.get("flight") or "").strip().upper()
-            reg = (a.get("r") or "").strip().upper()
-            if cs and reg:
-                m[cs] = reg
-        if m:
-            return m
-    return {}
+            out.append({
+                "icao24": (a.get("hex") or "").lower().lstrip("~"),
+                "callsign": (a.get("flight") or "").strip() or None,
+                "reg": (a.get("r") or "").strip() or None,
+                "type": a.get("t"),
+                "alt": a.get("alt_baro"),
+                "gs": a.get("gs"),
+                "lat": a.get("lat"),
+                "lon": a.get("lon"),
+                "track": a.get("track"),
+                "squawk": a.get("squawk"),
+                "military": bool((a.get("dbFlags") or 0) & 1),
+                "interesting": bool((a.get("dbFlags") or 0) & 2),
+            })
+        if out:
+            return out
+    return []
 
 
 def warm_snapshot():
     """Force-refresh the snapshot (called from the background scheduler so a
     user never pays the ~30s build). Safe to call often; no-op on empty fetch."""
-    m = _fetch_snapshot_map()
-    if m:
-        _snap_cache.update(ts=time.time(), map=m)
+    ac = _fetch_snapshot()
+    if ac:
+        m = {}
+        for a in ac:
+            cs = (a.get("callsign") or "").strip().upper()
+            reg = (a.get("reg") or "").strip().upper()
+            if cs and reg:
+                m[cs] = reg
+        _snap_cache.update(ts=time.time(), map=m, ac=ac)
     return len(_snap_cache["map"])
+
+
+def snapshot_aircraft():
+    """Aircraft from the last cached bulk snapshot (with positions) — for the
+    live radar scope. A pure in-memory read; never makes a network call."""
+    return _snap_cache["ac"]
 
 
 def tail_for_flight(ident):

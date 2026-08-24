@@ -471,9 +471,11 @@ def live_positions(icao: str, radius: int = Query(40, ge=5, le=120)):
         if not ap:
             raise HTTPException(404, "airport not covered")
         ap = dict(ap)
-    alive = sources.AirplanesLiveSource()
+    # Read from the background-maintained snapshot (fast, never rate-limited)
+    # instead of a live per-request ADS-B fetch, which the free feed throttles
+    # from datacenter IPs — that's what left the radar stuck on "scanning…".
     out = []
-    for a in alive.fetch_snapshot(ap["lat"], ap["lon"], radius_nm=radius):
+    for a in live_extras.snapshot_aircraft():
         if a.get("lat") is None or a.get("lon") is None:
             continue
         dist = sources.haversine_nm(ap["lat"], ap["lon"], a["lat"], a["lon"])
@@ -483,10 +485,15 @@ def live_positions(icao: str, radius: int = Query(40, ge=5, le=120)):
         ac = ac_mod.classify(ac_mod.get_aircraft(a["icao24"]))
         notable = bool(ac.get("base_interest") or a.get("military")
                        or ac.get("category") in ("military", "gov", "warbird", "tanker", "testbed", "special"))
+        # Prefer the DB's curated data, but fall back to the tail/type the ADS-B
+        # snapshot itself carries so contacts still label cleanly.
+        reg = ac.get("registration") or a.get("reg")
+        typ = ac.get("typecode") or a.get("type")
+        disp = ac_mod.display_name(ac) if ac.get("registration") else (reg or a.get("callsign") or a["icao24"])
         out.append({
             "icao24": a["icao24"], "callsign": a.get("callsign"),
-            "registration": ac.get("registration"), "type": ac.get("typecode"),
-            "display": ac_mod.display_name(ac) if ac.get("registration") else (a.get("callsign") or a["icao24"]),
+            "registration": reg, "type": typ,
+            "display": disp,
             "bearing": round(brg, 1), "dist_nm": round(dist, 1),
             "alt": a.get("alt"), "gs": a.get("gs"), "track": a.get("track"),
             "notable": notable, "category": ac.get("category"),
