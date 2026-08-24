@@ -309,9 +309,9 @@
     <label class="muted">Window</label>
     <select id="hours"><option value="24" selected>24h</option><option value="48">48h</option><option value="168">7d</option><option value="720">30d</option></select>
     <select id="filter" style="display:none"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
-    <button class="primary" id="refresh">↻ Run cycle now</button>
-    <button class="ghost" id="faScan" title="Quick scan: next several hours of scheduled arrivals">✈ Scan FlightAware</button>
-    <button class="ghost" id="faDeep" title="Deep scan: pages the full next day so no special livery is missed (uses more FlightAware queries)">🔎 Deep scan (full day)</button>
+    <button class="primary" id="refresh" style="display:none">↻ Run cycle now</button>
+    <button class="ghost" id="faScan" style="display:none" title="Quick scan">✈ Scan FlightAware</button>
+    <button class="primary" id="faDeep" title="Load the full day's flights (special liveries included)">🔎 Load full day</button>
     <span class="pill fa" id="faBudget" title="FlightAware free-tier queries left this month" style="display:none"></span>
   </div>
   <div class="wx" id="wx" style="display:none"></div>
@@ -1070,14 +1070,14 @@ async function init(){
       ticks++;
       let s={}; try{s=await j('/api/flightaware/scan/status');}catch(e){}
       if(s.running){
-        fd.textContent=`Deep scanning… (${s.new_alerts||0} special so far)`;
+        fd.textContent=`Loading… (${s.new_alerts||0} special so far)`;
         if(TAB==="board")loadBoard().then(loadPhotos);
       }else{
         clearInterval(poll); fd.disabled=false; fd.textContent="✓ Full day loaded";
-        setTimeout(()=>{fd.textContent="🔎 Deep scan (full day)";},4000);
+        setTimeout(()=>{fd.textContent="🔎 Load full day";},4000);
         loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);   // silent — board shows the result
       }
-      if(ticks>60){clearInterval(poll); fd.disabled=false; fd.textContent="🔎 Deep scan (full day)";}
+      if(ticks>60){clearInterval(poll); fd.disabled=false; fd.textContent="🔎 Load full day";}
     },5000);
     loadFaBudget();
   };
