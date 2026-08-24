@@ -526,7 +526,13 @@ const JTFGROUPS=[
 const HUBS={KPHX:['american','southwest'],KLAX:['american','united','delta','southwest','spirit'],
             KIWA:['allegiant'],KDFW:['american'],KATL:['delta'],KDEN:['united','southwest','frontier']};
 const US_CARRIERS=['american','southwest','delta','united','alaska','jetblue','spirit','frontier',
-  'hawaiian','sun country','allegiant','fedex','ups','skywest','envoy','republic','endeavor','horizon'];
+  'hawaiian','sun country','allegiant','fedex','ups','skywest','envoy','republic','endeavor','horizon',
+  // US cargo, charter, regional & business-jet operators — domestic, not international
+  'abx','air transport','ati','atlas air','kalitta','amerijet','western global','national air','omni air',
+  'polar air','flexjet','netjets','executive jet','vista','flyexclusive','planesense','jet linx',
+  'wheels up','advanced air','contour','denver air','boutique air','southern airways','jsx','breeze',
+  'avelo','mesa','gojet','air wisconsin','piedmont','psa','cape air','silver airways','ameriflight','southern express',
+  'empire','mountain air','key lime','berry aviation','ameristar','usa jet','iaero','swift air','xtra'];
 const HEAVY_RE=/A380|A350|A340|A330|A300|A310|747|777|767|787|A35|A34|A33|A38|B74|B76|B77|B78|MD11|MD-11|DC10|DC-10|ILYUSHIN|ANTONOV/i;
 const BIZ_RE=/GULFSTREAM|CITATION|LEARJET|CHALLENGER|GLOBAL|FALCON|PHENOM|LEGACY|PRAETOR|HAWKER|PILATUS|KING ?AIR|HONDAJET|VISION JET|GLEX|GLF|G[0-9]{3}\b|BEECHJET|NEXTANT/i;
 function evIsHeavy(e){return HEAVY_RE.test((e.type||'').toUpperCase());}
