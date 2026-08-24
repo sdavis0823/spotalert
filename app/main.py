@@ -712,26 +712,36 @@ def photo_by_reg(reg: str = "", type: str = "", ident: str = ""):
     Starlux JX26), try the LIVE ADS-B feed: if the plane is airborne, its tail
     is broadcasting and we can fetch the real photo of the actual airframe."""
     slug = type_art.resolve(None, type) if type else None
-    if not reg and ident:
+    # `live` is True when the tail came from the live ADS-B snapshot, i.e. the
+    # aircraft is airborne/broadcasting right now — used by the UI to point the
+    # FR24 link at the live flight view instead of the static aircraft page.
+    live_now = False
+    if ident:
+        # A hit in the live snapshot means the aircraft is broadcasting right now.
         try:
-            live = live_extras.tail_for_flight(ident)
+            live_reg = live_extras.tail_for_flight(ident)
         except Exception:  # noqa: BLE001
-            live = None
-        if live:
-            reg = live
+            live_reg = None
+        if live_reg:
+            live_now = True
+            if not reg:
+                reg = live_reg
     pic = None
     if reg:
         try:
             pic = photos.get_photo("", reg.upper())
         except Exception:  # noqa: BLE001
             pic = None
+    tail = reg.upper() if reg else None
     if pic and (pic.get("thumbnail_large") or pic.get("thumbnail")):
         return {"image_url": pic.get("thumbnail_large") or pic.get("thumbnail"),
                 "image_credit": pic.get("photographer") or pic.get("credit"),
-                "image_link": pic.get("link"), "image_is_art": False, "type_art": slug}
+                "image_link": pic.get("link"), "image_is_art": False,
+                "type_art": slug, "tail": tail, "live": live_now}
     return {"image_url": f"/static/types/{slug}.png" if slug else None,
             "image_credit": None, "image_link": None,
-            "image_is_art": bool(slug), "type_art": slug}
+            "image_is_art": bool(slug), "type_art": slug,
+            "tail": tail, "live": live_now}
 
 
 @app.get("/api/diag/psprobe")
