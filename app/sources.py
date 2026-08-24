@@ -103,11 +103,20 @@ class OpenSkySource:
 
 
 # ----------------------------------------------------------------------------
-# airplanes.live — free UNFILTERED live snapshot. Catches blocked/mil frames.
+# Free UNFILTERED live ADS-B snapshot (re-api / "readsb" v2 format). Catches
+# blocked/mil frames. airplanes.live now gates anonymous/datacenter access, so
+# we prefer the open mirrors adsb.lol and adsb.fi (identical response shape)
+# and keep airplanes.live only as a last resort.
 # ----------------------------------------------------------------------------
 class AirplanesLiveSource:
     name = "airplanes.live"
-    BASE = "https://api.airplanes.live/v2"
+    # Tried in order; first one that answers with an `ac` array wins.
+    BASES = [
+        "https://api.adsb.lol/v2",
+        "https://opendata.adsb.fi/api/v2",
+        "https://api.airplanes.live/v2",
+    ]
+    _UA = "SpotAlert/1.0 (+https://spotalert.onrender.com)"
 
     def available(self) -> bool:
         return True  # public, no key for basic radius queries
@@ -118,29 +127,36 @@ class AirplanesLiveSource:
         These are live positions, not board events; the engine converts a
         low-altitude aircraft near the field into an arrival/departure candidate.
         """
-        url = f"{self.BASE}/point/{lat}/{lon}/{min(radius_nm, 250)}"
-        try:
-            with httpx.Client() as client:
-                r = client.get(url, timeout=20)
-                r.raise_for_status()
-                for ac in (r.json().get("ac") or []):
-                    yield {
-                        "icao24": (ac.get("hex") or "").lower().lstrip("~"),
-                        "callsign": (ac.get("flight") or "").strip() or None,
-                        "reg": ac.get("r"),
-                        "type": ac.get("t"),
-                        "alt": ac.get("alt_baro"),
-                        "gs": ac.get("gs"),
-                        "lat": ac.get("lat"),
-                        "lon": ac.get("lon"),
-                        "track": ac.get("track"),      # ground track (deg) — used by ETA heading filter
-                        "squawk": ac.get("squawk"),    # transponder code — emergency detection
-                        # airplanes.live dbFlags: bit1=military, bit2=interesting/special
-                        "military": bool((ac.get("dbFlags") or 0) & 1),
-                        "interesting": bool((ac.get("dbFlags") or 0) & 2),
-                    }
-        except (httpx.HTTPError, ValueError):
+        path = f"/point/{lat}/{lon}/{min(radius_nm, 250)}"
+        aclist = None
+        with httpx.Client(headers={"User-Agent": self._UA}) as client:
+            for base in self.BASES:
+                try:
+                    r = client.get(f"{base}{path}", timeout=20)
+                    r.raise_for_status()
+                    aclist = r.json().get("ac") or []
+                    if aclist:
+                        break
+                except (httpx.HTTPError, ValueError):
+                    continue
+        if not aclist:
             return
+        for ac in aclist:
+            yield {
+                "icao24": (ac.get("hex") or "").lower().lstrip("~"),
+                "callsign": (ac.get("flight") or "").strip() or None,
+                "reg": ac.get("r"),
+                "type": ac.get("t"),
+                "alt": ac.get("alt_baro"),
+                "gs": ac.get("gs"),
+                "lat": ac.get("lat"),
+                "lon": ac.get("lon"),
+                "track": ac.get("track"),      # ground track (deg) — used by ETA heading filter
+                "squawk": ac.get("squawk"),    # transponder code — emergency detection
+                # dbFlags: bit1=military, bit2=interesting/special
+                "military": bool((ac.get("dbFlags") or 0) & 1),
+                "interesting": bool((ac.get("dbFlags") or 0) & 2),
+            }
 
 
 def haversine_nm(lat1, lon1, lat2, lon2) -> float:

@@ -35,27 +35,37 @@ def _ident_to_callsign(ident):
     return (icao + m.group(2)) if icao else None
 
 
+# Open ADS-B mirrors (re-api v2 format). airplanes.live now gates anonymous /
+# datacenter access, so adsb.lol / adsb.fi are primary; airplanes.live is last.
+_ADSB_BASES = [
+    "https://api.adsb.lol/v2",
+    "https://opendata.adsb.fi/api/v2",
+    "https://api.airplanes.live/v2",
+]
+
+
 def tail_for_flight(ident):
     """Registration of the aircraft currently flying under this flight number,
-    from the free airplanes.live ADS-B feed. Works whenever the plane is AIRBORNE
-    (most long-haul intl arrivals already are), even before it lands. None if the
-    plane isn't broadcasting yet or the callsign can't be mapped."""
+    from a free ADS-B feed. Works whenever the plane is AIRBORNE (most long-haul
+    intl arrivals already are), even before it lands. None if the plane isn't
+    broadcasting yet or the callsign can't be mapped."""
     cs = _ident_to_callsign(ident)
     if not cs:
         return None
-    try:
-        with httpx.Client(timeout=8, headers={
-                "User-Agent": "SpotAlert/1.0 (+https://spotalert.onrender.com)"}) as c:
-            r = c.get(f"https://api.airplanes.live/v2/callsign/{cs}")
-            if r.status_code != 200:
-                return None
-            data = r.json()
-    except (httpx.HTTPError, ValueError):
-        return None
-    for a in (data.get("ac") or []):
-        reg = (a.get("r") or "").strip().upper()
-        if reg:
-            return reg
+    with httpx.Client(timeout=8, headers={
+            "User-Agent": "SpotAlert/1.0 (+https://spotalert.onrender.com)"}) as c:
+        for base in _ADSB_BASES:
+            try:
+                r = c.get(f"{base}/callsign/{cs}")
+                if r.status_code != 200:
+                    continue
+                data = r.json()
+            except (httpx.HTTPError, ValueError):
+                continue
+            for a in (data.get("ac") or []):
+                reg = (a.get("r") or "").strip().upper()
+                if reg:
+                    return reg
     return None
 
 
