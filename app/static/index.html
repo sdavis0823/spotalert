@@ -674,11 +674,28 @@ function rowTap(ev,el){
   openFlightDetail(el.dataset);
 }
 function closeFl(){$("#flModal").classList.remove("on");}
+function setFr24Link(ident, tail, live){
+  const a=$("#flLinks")&&$("#flLinks").querySelector('a'); if(!a)return;
+  const id=(ident||'').toLowerCase().trim();
+  if(live&&id){                       // airborne now -> the flight's live view
+    a.href=`https://www.flightradar24.com/data/flights/${encodeURIComponent(id)}`;
+    a.dataset.live='1';
+  }else if(tail){                     // not live -> the regular aircraft page
+    a.href=`https://www.flightradar24.com/data/aircraft/${encodeURIComponent(String(tail).toLowerCase())}`;
+    a.dataset.live='';
+  }else if(id){
+    a.href=`https://www.flightradar24.com/data/flights/${encodeURIComponent(id)}`;
+    a.dataset.live='';
+  }
+}
 async function loadFlightPhoto(reg,type,ident){
   const box=$("#flContent"); const ph=box&&box.querySelector('.fl-photo'); if(!ph)return;
   let d;
   try{ d=await j('/api/photo-by-reg?reg='+encodeURIComponent(reg||'')+'&type='+encodeURIComponent(type||'')+'&ident='+encodeURIComponent(ident||'')); }
   catch(e){ ph.textContent='No image for this aircraft'; return; }
+  // Point the "Track on FR24" link at the LIVE flight when the plane is airborne
+  // now, otherwise the regular aircraft page. Live wins over the detail upgrade.
+  if(d){ setFr24Link(ident, d.tail, d.live); }
   if(!d||!d.image_url){ ph.textContent='No image for this aircraft'; return; }
   const img=new Image(); img.className='fl-photo'+(d.image_is_art?' art':''); img.alt='aircraft';
   const c=document.createElement('div'); c.className='fl-credit';
@@ -735,9 +752,10 @@ async function openFlightDetail(ds){
       const grid=box.querySelector('.fl-grid');
       const extra=[];
       if(d.registration)extra.push(['Tail #',d.registration]);
-      // FR24 resolves a tail number reliably; upgrade the link now that we know it
+      // Point FR24 at the aircraft page once we know the tail — but NOT when the
+      // flight is live (setFr24Link already sent it to the live view; keep that).
       if(d.registration){const a=$("#flLinks")&&$("#flLinks").querySelector('a');
-        if(a)a.href=`https://www.flightradar24.com/data/aircraft/${encodeURIComponent(d.registration.toLowerCase())}`;}
+        if(a&&a.dataset.live!=='1')a.href=`https://www.flightradar24.com/data/aircraft/${encodeURIComponent(d.registration.toLowerCase())}`;}
       const gate=isArr?(d.arr_gate||d.arr_terminal):(d.dep_gate||d.dep_terminal);
       if(gate)extra.push([isArr?'Arr gate':'Dep gate',gate]);
       extra.forEach(([k,v])=>{const c=document.createElement('div');c.className='fl-cell';
