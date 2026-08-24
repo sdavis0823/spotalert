@@ -3,12 +3,10 @@
 Keyed by REGISTRATION; applying tags them base_interest=1 so they always push.
 Matched by registration in scheduled arrivals and (via the aircraft DB) live.
 
-Compiled from published enthusiast/news livery lists (airportspotting.com,
-simpleflying.com, aeroxplorer.com, airlinegeeks.com, worldairlinenews.com,
-planespotters.net, official airline pages) covering North / Latin America,
-Europe, Middle East, Africa, and Asia-Pacific carriers. All REAL registrations,
-no invented tails. Liveries change (repaints/retirements), so treat as a living
-list — grow it with the in-app tag button / POST /api/aircraft/tag.
+Compiled from published enthusiast/news livery lists plus in-app tagging. All
+REAL registrations, no invented tails. Liveries change (repaints/retirements),
+so treat as a living list — grow it with the in-app ✦ Tag button / POST
+/api/aircraft/tag until it matches what you see in the field.
 """
 CURATED_LIVERIES = [
     ('4R-ALH', 'special', ['special-livery', 'srilankan-oneworld']),
@@ -207,6 +205,7 @@ CURATED_LIVERIES = [
     ('N75435', 'special', ['heritage', 'continental']),
     ('N760MQ', 'special', ['heritage', 'tricolor']),
     ('N763JB', 'special', ['special-livery', 'jetblue-retro']),
+    ('N76522', 'special', ['special-livery', 'united-star-alliance']),
     ('N768AX', 'special', ['retro', 'airborne-express']),
     ('N775JB', 'special', ['special-livery', 'vets-in-blue']),
     ('N776AV', 'special', ['retro', 'avianca-aerogal']),
@@ -317,6 +316,7 @@ CURATED_LIVERIES = [
     ('VT-BWD', 'special', ['special-livery', 'air-india-express-flying-canvas']),
     ('VT-RNT', 'special', ['special-livery', 'air-india-express-ratan-tata']),
     ('XA-ADL', 'special', ['special-livery', 'aeromexico-quetzalcoatl']),
+    ('XA-VUR', 'special', ['special-livery', 'volaris']),
     ('YL-ABX', 'special', ['special-livery', 'airbaltic-50th-a220']),
     ('YR-BGG', 'special', ['retro', 'tarom']),
     ('ZK-NZE', 'special', ['special-livery', 'air-nz-all-black']),

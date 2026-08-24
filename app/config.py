@@ -85,7 +85,7 @@ FA_SCHED_PAGES = int(os.environ.get("FA_SCHED_PAGES", "5"))
 # "Deep scan" (manual, on-demand) — pages a full next-day window so no special
 # livery scheduled tomorrow is missed. Costs more queries, but user-triggered
 # and still guarded by the hard monthly cap, so it can never cause a charge.
-FA_DEEP_PAGES = int(os.environ.get("FA_DEEP_PAGES", "26"))
+FA_DEEP_PAGES = int(os.environ.get("FA_DEEP_PAGES", "34"))
 # Weekly auto-refresh of the community notable-aircraft registry (free source).
 REGISTRY_REFRESH_INTERVAL_SEC = int(os.environ.get("REGISTRY_REFRESH_INTERVAL_SEC", "604800"))
 # HARD monthly cap on FlightAware queries — the app refuses to call AeroAPI once
