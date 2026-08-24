@@ -650,14 +650,29 @@ def flight_detail(ident: str):
             # is known. Without a reg its "photo" can be any operator's example of
             # the type (e.g. a WOW Air jet for an American flight) — misleading.
             # So when there's no reg, show a labeled type illustration instead.
-            if not d.get("registration"):
+            reg = d.get("registration")
+            if not reg:
                 d["image_url"] = f"/types/{slug}.png" if slug else None
                 d["image_credit"] = None
                 d["image_link"] = None
                 d["image_is_art"] = bool(slug)
-            elif not d.get("image_url") and slug:
-                d["image_url"] = f"/types/{slug}.png"
-                d["image_is_art"] = True
+            else:
+                # Prefer Planespotters (better source: real spotter photo of the
+                # actual airframe, with photographer credit + link). Fall back to
+                # AeroDataBox's own photo, then to the labeled type illustration.
+                pic = None
+                try:
+                    pic = photos.get_photo(d.get("icao24") or "", reg)
+                except Exception:  # noqa: BLE001
+                    pic = None
+                if pic and (pic.get("thumbnail_large") or pic.get("thumbnail")):
+                    d["image_url"] = pic.get("thumbnail_large") or pic.get("thumbnail")
+                    d["image_credit"] = pic.get("photographer") or pic.get("credit")
+                    d["image_link"] = pic.get("link")
+                    d["image_is_art"] = False
+                elif not d.get("image_url") and slug:
+                    d["image_url"] = f"/types/{slug}.png"
+                    d["image_is_art"] = True
             return {"ok": True, **d}
     return {"ok": False, "note": "No live detail available for this flight yet."}
 
