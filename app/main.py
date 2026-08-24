@@ -471,11 +471,10 @@ def live_positions(icao: str, radius: int = Query(40, ge=5, le=120)):
         if not ap:
             raise HTTPException(404, "airport not covered")
         ap = dict(ap)
-    # Read from the background-maintained snapshot (fast, never rate-limited)
-    # instead of a live per-request ADS-B fetch, which the free feed throttles
-    # from datacenter IPs — that's what left the radar stuck on "scanning…".
+    # TRUE live tracking: a fresh per-request /point/ (fast at radar radii),
+    # briefly cached with a last-good fallback so it never blinks empty.
     out = []
-    for a in live_extras.snapshot_aircraft():
+    for a in live_extras.live_point(ap["lat"], ap["lon"], radius):
         if a.get("lat") is None or a.get("lon") is None:
             continue
         dist = sources.haversine_nm(ap["lat"], ap["lon"], a["lat"], a["lon"])

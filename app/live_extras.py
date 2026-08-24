@@ -59,19 +59,14 @@ _SNAP_RADIUS = 250                    # nm (mirror max)
 _snap_cache = {"ts": 0.0, "map": {}, "ac": []}
 
 
-def _fetch_snapshot():
-    """One bulk /point/ query around the home field -> list of normalized
-    aircraft dicts (icao24/callsign/reg/type/alt/gs/lat/lon/track/...), or [].
-
-    This runs only in the background (scheduler), never on a user request, so it
-    can afford a generous timeout: when a mirror throttles a datacenter IP it
-    often still answers, just slowly — a long timeout catches that instead of
-    giving up and leaving the snapshot empty."""
-    lat, lon = _SNAP_CENTER
+def _fetch_point(lat, lon, radius, timeout):
+    """One bulk /point/ query -> list of normalized aircraft dicts, or [].
+    Tries each open mirror in turn. Small-radius calls (the radar, ≤120nm) answer
+    fast per-request from any IP; only the wide 250nm warm needs a long timeout."""
     for base in _ADSB_BASES:
         try:
-            with httpx.Client(timeout=40, headers={"User-Agent": _TAIL_UA}) as c:
-                r = c.get(f"{base}/point/{lat}/{lon}/{_SNAP_RADIUS}")
+            with httpx.Client(timeout=timeout, headers={"User-Agent": _TAIL_UA}) as c:
+                r = c.get(f"{base}/point/{lat}/{lon}/{int(radius)}")
                 if r.status_code != 200:
                     continue
                 acs = r.json().get("ac") or []
@@ -98,6 +93,34 @@ def _fetch_snapshot():
         if out:
             return out
     return []
+
+
+def _fetch_snapshot():
+    """The wide home-field snapshot for the background scheduler (long timeout,
+    since it runs off the user path and a throttled mirror may answer slowly)."""
+    return _fetch_point(_SNAP_CENTER[0], _SNAP_CENTER[1], _SNAP_RADIUS, timeout=40)
+
+
+# ---- true live radar: fresh per-request /point/, briefly cached -------------
+_live_cache = {}   # (lat,lon,radius) -> (ts, aircraft list)
+_LIVE_TTL = 6      # seconds; radar polls ~every 8s so each poll gets fresh data
+
+
+def live_point(lat, lon, radius):
+    """A FRESH live ADS-B snapshot around a point, for the radar scope — this is
+    real live tracking (a per-request /point/, which answers fast at radar radii).
+    Cached ~6s so rapid polls share one call, and if a call is momentarily
+    throttled it returns the last good result so the scope never blinks empty."""
+    key = (round(lat, 3), round(lon, 3), int(radius))
+    hit = _live_cache.get(key)
+    now = time.time()
+    if hit and now - hit[0] < _LIVE_TTL:
+        return hit[1]
+    ac = _fetch_point(lat, lon, min(int(radius), 250), timeout=8)
+    if ac:
+        _live_cache[key] = (now, ac)
+        return ac
+    return hit[1] if hit else []
 
 
 def warm_snapshot():
