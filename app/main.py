@@ -701,6 +701,29 @@ def photo_debug(reg: str):
     return {"reg": reg.upper(), "result": result, "diag": photos.LAST_DIAG}
 
 
+@app.get("/api/photo/probe")
+def photo_probe(reg: str = "N944WN"):
+    """Bulletproof, self-contained probe: hit Planespotters directly from THIS
+    server and report the raw HTTP status / body / exception, no layering."""
+    import httpx
+    import traceback
+    reg = reg.upper()
+    ua = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+    out = {"reg": reg}
+    for label, hdrs in (("browser_ua", {"User-Agent": ua, "Accept": "application/json"}),
+                        ("no_ua", {})):
+        url = f"https://api.planespotters.net/pub/photos/reg/{reg}"
+        try:
+            r = httpx.get(url, headers=hdrs, timeout=15, follow_redirects=True)
+            out[label] = {"status": r.status_code, "len": len(r.text or ""),
+                          "body": (r.text or "")[:300]}
+        except Exception as e:  # noqa: BLE001
+            out[label] = {"exception": f"{type(e).__name__}: {str(e)[:200]}",
+                          "trace": traceback.format_exc()[-300:]}
+    return out
+
+
 @app.get("/api/flightaware/scan/status")
 def flightaware_scan_status():
     """Progress of a background deep scan (for the UI's 'filling in…' state)."""
