@@ -42,6 +42,14 @@ def _refresh_all(hours: int) -> dict:
     with db.get_conn() as conn:
         airports = [dict(r) for r in conn.execute("SELECT * FROM airports").fetchall()]
 
+    # Warm the live-tail snapshot FIRST, while the ADS-B rate-limit budget is
+    # freshest, so card opens (which only read this cached map) are instant.
+    try:
+        from . import live_extras
+        totals["tail_snapshot"] = live_extras.warm_snapshot()
+    except Exception as e:  # noqa: BLE001
+        totals["tail_snapshot"] = {"error": str(e)}
+
     if opensky.available():
         totals["sources"].append("opensky")
         for ap in airports:
@@ -73,14 +81,6 @@ def _refresh_all(hours: int) -> dict:
         totals["inbound"] = eta_mod.scan_all()
     except Exception as e:  # noqa: BLE001
         totals["inbound"] = {"error": str(e)}
-
-    # Re-warm the live-tail snapshot in the background so a user never pays the
-    # ~30s bulk /point/ fetch (throttled from datacenter IPs) when opening a card.
-    try:
-        from . import live_extras
-        totals["tail_snapshot"] = live_extras.warm_snapshot()
-    except Exception as e:  # noqa: BLE001
-        totals["tail_snapshot"] = {"error": str(e)}
 
     # emergency squawk watch (free live feed) — 7500/7600/7700 near a field
     if config.EMERGENCY_SQUAWK_ENABLED:

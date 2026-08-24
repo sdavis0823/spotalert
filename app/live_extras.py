@@ -8,7 +8,6 @@ Three spotter features built on data that costs nothing:
 import re
 import time
 import httpx
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from . import sources, config, aircraft as ac_mod
 
 # IATA flight-number prefix -> ICAO callsign prefix, so we can turn a schedule
@@ -47,24 +46,15 @@ _ADSB_BASES = [
 
 
 _TAIL_UA = "SpotAlert/1.0 (+https://spotalert.onrender.com)"
-_tail_cache = {}          # callsign -> (timestamp, reg-or-None)
-_TAIL_TTL_HIT = 120       # a resolved tail is stable for a while
-_TAIL_TTL_MISS = 25       # a miss (not airborne yet) is retried sooner
 
-# A single wide /point/ snapshot answers FAST from any IP (that's how the board
-# scanner works), whereas per-/callsign/ queries are throttled to ~30s from
-# datacenter IPs. So we resolve tails from one cached bulk snapshot around the
-# home field and only fall back to the slow per-callsign lookup for a flight
-# that's outside the snapshot radius (e.g. still far offshore).
+# One wide /point/ snapshot answers fast and covers everything airborne near the
+# field, whereas per-/callsign/ queries are throttled to ~30s from datacenter
+# IPs. So the ONLY ADS-B fetching happens in the background (scheduler ->
+# warm_snapshot), and card opens are pure in-memory reads of this map. That keeps
+# lookups instant AND stops user traffic from ever tripping the feed's rate limit.
 _SNAP_CENTER = (33.4342, -112.0116)   # KPHX
 _SNAP_RADIUS = 250                    # nm (mirror max)
-# The bulk /point/ call is ~30s from a throttled datacenter IP, so the
-# background scheduler re-warms this every cycle (see scheduler.py) and we keep
-# it valid across the 5-min gap. A tail number never changes mid-flight, so a
-# few minutes of staleness is harmless; a flight outside the snapshot still has
-# the slow per-callsign fallback.
-_SNAP_TTL = 360
-_snap_cache = {"ts": 0.0, "map": {}}  # {CALLSIGN: REG}
+_snap_cache = {"ts": 0.0, "map": {}}  # {CALLSIGN: REG}; last good snapshot kept
 
 
 def _fetch_snapshot_map():
@@ -101,64 +91,21 @@ def warm_snapshot():
     return len(_snap_cache["map"])
 
 
-def _point_snapshot():
-    """callsign -> registration for everything airborne near the home field,
-    from one cached bulk /point/ query, shared across lookups."""
-    if _snap_cache["map"] and time.time() - _snap_cache["ts"] < _SNAP_TTL:
-        return _snap_cache["map"]
-    m = _fetch_snapshot_map()
-    if m:
-        _snap_cache.update(ts=time.time(), map=m)
-        return m
-    return _snap_cache["map"]  # stale is better than nothing
-
-
-def _tail_from_base(base, cs):
-    """Query one ADS-B mirror for a callsign; return its registration or None."""
-    try:
-        with httpx.Client(timeout=6, headers={"User-Agent": _TAIL_UA}) as c:
-            r = c.get(f"{base}/callsign/{cs}")
-            if r.status_code != 200:
-                return None
-            for a in (r.json().get("ac") or []):
-                reg = (a.get("r") or "").strip().upper()
-                if reg:
-                    return reg
-    except (httpx.HTTPError, ValueError):
-        return None
-    return None
-
-
 def tail_for_flight(ident):
-    """Registration of the aircraft currently flying under this flight number,
-    from a free ADS-B feed. Works whenever the plane is AIRBORNE (most long-haul
-    intl arrivals already are), even before it lands. None if the plane isn't
-    broadcasting yet or the callsign can't be mapped.
+    """Registration of the aircraft currently flying under this flight number.
 
-    The mirrors are queried CONCURRENTLY (first answer wins) so a slow or
-    rate-limiting mirror can't stall the request, and results are cached briefly
-    so opening the same card twice is instant."""
+    This is a PURE in-memory read of the background-maintained snapshot — it
+    never makes a network call, so a card open is always instant and user
+    traffic can never saturate the ADS-B feed's rate limit. The snapshot is
+    refreshed in the background by the scheduler (see warm_snapshot). Returns
+    None if the flight isn't in the latest snapshot (not airborne near the
+    field, or callsign can't be mapped), in which case the card shows the
+    type illustration.
+    """
     cs = _ident_to_callsign(ident)
     if not cs:
         return None
-    hit = _tail_cache.get(cs)
-    if hit and time.time() - hit[0] < (_TAIL_TTL_HIT if hit[1] else _TAIL_TTL_MISS):
-        return hit[1]
-    # Fast path: the shared bulk snapshot (one quick call, cached).
-    reg = _point_snapshot().get(cs)
-    if reg:
-        _tail_cache[cs] = (time.time(), reg)
-        return reg
-    # Slow path: per-callsign lookup for a flight outside the snapshot radius.
-    with ThreadPoolExecutor(max_workers=len(_ADSB_BASES)) as ex:
-        futs = [ex.submit(_tail_from_base, b, cs) for b in _ADSB_BASES]
-        for f in as_completed(futs):
-            r = f.result()
-            if r:
-                reg = r
-                break
-    _tail_cache[cs] = (time.time(), reg)
-    return reg
+    return _snap_cache["map"].get(cs)
 
 
 # Emergency transponder codes and what they mean.
