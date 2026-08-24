@@ -641,6 +641,14 @@ def flight_detail(ident: str):
     if adb_mod.available():
         d = adb_mod.flight_detail(ident)
         if d:
+            # Guarantee an image: if AeroDataBox has no real photo (common for
+            # flights whose tail isn't assigned yet), fall back to a clean
+            # illustration of the aircraft TYPE so every card shows a plane.
+            slug = type_art.resolve(None, d.get("model"))
+            d["type_art"] = slug
+            if not d.get("image_url") and slug:
+                d["image_url"] = f"/types/{slug}.png"
+                d["image_is_art"] = True
             return {"ok": True, **d}
     return {"ok": False, "note": "No live detail available for this flight yet."}
 

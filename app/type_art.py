@@ -80,6 +80,40 @@ ICAO2SLUG = {
 }
 
 
+# Precise human-model -> slug patterns, checked BEFORE the loose token match so
+# shared number suffixes ("-300", "-900") can't cross-match the wrong type.
+# First matching regex wins; nearest available render when exact art is absent.
+MODEL_PATTERNS = [
+    (r"a350[- ]?1000|a35k", "airbus-a350-1000"), (r"a350", "airbus-a350-900"),
+    (r"a380", "airbus-a380-800"),
+    (r"a330[- ]?900|a330neo|a33[89]", "airbus-a330-900neo"), (r"a330|a33[23]", "airbus-a330-300"),
+    (r"a340", "airbus-a340-600"),
+    (r"a220|bcs3|cs300", "airbus-a220-300"),
+    (r"a321|a21n", "airbus-a321neo"),
+    (r"a320|a20n", "airbus-a320neo"),
+    (r"a319|a19n", "airbus-a319neo"),
+    (r"787[- ]?10|78x", "boeing-787-10"), (r"787|dreamliner", "boeing-787-9"),
+    (r"777", "boeing-777-300er"),
+    (r"767", "boeing-767-300er"), (r"757", "boeing-757-200"),
+    (r"747", "boeing-747-8"), (r"717", "boeing-717-200"),
+    (r"737.*(max|8200)|73[89]m|max ?[89]", "boeing-737-max-8"), (r"73[0-9]|737", "boeing-737-800"),
+    (r"e19[05]|e2 ?jet|embraer.*19[05]", "embraer-e195-e2"),
+    (r"e17[05]|embraer.*17[05]|erj.?17", "embraer-e175"),
+    (r"crj", "crj900"),
+    (r"dash ?8|q400|dhc-?8", "dash-8-q400"),
+    (r"atr[ -]?72|atr72", "atr-72-600"),
+    (r"md[- ]?11", "md-11"), (r"md[- ]?8|md8", "md-80"),
+]
+
+
+def _model_slug(model: str | None):
+    hay = re.sub(r"[^a-z0-9 ]", " ", (model or "").lower())
+    for pat, slug in MODEL_PATTERNS:
+        if slug in _SLUGS and re.search(pat, hay):
+            return slug
+    return None
+
+
 def resolve(typecode: str | None, model: str | None = None) -> str | None:
     """Best illustration slug for an aircraft, or None if we have no art."""
     manifest()
@@ -88,6 +122,9 @@ def resolve(typecode: str | None, model: str | None = None) -> str | None:
     tc = (typecode or "").upper().strip()
     if tc in ICAO2SLUG and ICAO2SLUG[tc] in _SLUGS:
         return ICAO2SLUG[tc]
+    ms = _model_slug(model)
+    if ms:
+        return ms
     # token match against the human model, e.g. "Gulfstream G650" -> g650.
     # Ignore manufacturer-only words so military Boeings/Airbuses don't match
     # a random airliner; require a distinctive model token (a number, or a
