@@ -5,8 +5,59 @@ Three spotter features built on data that costs nothing:
   * "overhead now" — what's flying above your GPS location right now,
   * airport weather + likely active runway, from aviationweather.gov METAR.
 """
+import re
 import httpx
 from . import sources, config, aircraft as ac_mod
+
+# IATA flight-number prefix -> ICAO callsign prefix, so we can turn a schedule
+# flight number (e.g. "JX26", Starlux) into the ADS-B callsign ("SJX26") that
+# the live feed broadcasts. Covers the carriers that serve PHX; extend freely.
+IATA2ICAO = {
+    "AA": "AAL", "WN": "SWA", "DL": "DAL", "UA": "UAL", "AS": "ASA", "B6": "JBU",
+    "NK": "NKS", "F9": "FFT", "HA": "HAL", "SY": "SCX", "G4": "AAY", "OO": "SKW",
+    "MQ": "ENY", "YX": "RPA", "YV": "ASH", "9E": "EDV", "OH": "JIA", "ZW": "AWI",
+    "GB": "ABX", "FX": "FDX", "5X": "UPS", "5Y": "GTI", "PT": "PDT",
+    "JX": "SJX", "CI": "CAL", "BR": "EVA", "AC": "ACA", "WS": "WJA", "BA": "BAW",
+    "DE": "CFG", "Y4": "VOI", "AM": "AMX", "LH": "DLH", "KL": "KLM", "JL": "JAL",
+    "NH": "ANA", "KE": "KAL", "QF": "QFA", "NZ": "ANZ", "AV": "AVA", "CM": "CMP",
+    "LA": "LAN", "AF": "AFR", "VB": "VIV", "4O": "AIJ", "WN ": "SWA",
+}
+
+
+def _ident_to_callsign(ident):
+    """schedule flight number -> ADS-B callsign, or None."""
+    s = (ident or "").upper().replace(" ", "")
+    m = re.match(r"^([A-Z0-9]{2})(\d{1,4}[A-Z]?)$", s)
+    if not m:
+        # maybe already a 3-letter ICAO callsign like SWA123
+        return s if re.match(r"^[A-Z]{3}\d", s) else None
+    icao = IATA2ICAO.get(m.group(1))
+    return (icao + m.group(2)) if icao else None
+
+
+def tail_for_flight(ident):
+    """Registration of the aircraft currently flying under this flight number,
+    from the free airplanes.live ADS-B feed. Works whenever the plane is AIRBORNE
+    (most long-haul intl arrivals already are), even before it lands. None if the
+    plane isn't broadcasting yet or the callsign can't be mapped."""
+    cs = _ident_to_callsign(ident)
+    if not cs:
+        return None
+    try:
+        with httpx.Client(timeout=8, headers={
+                "User-Agent": "SpotAlert/1.0 (+https://spotalert.onrender.com)"}) as c:
+            r = c.get(f"https://api.airplanes.live/v2/callsign/{cs}")
+            if r.status_code != 200:
+                return None
+            data = r.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    for a in (data.get("ac") or []):
+        reg = (a.get("r") or "").strip().upper()
+        if reg:
+            return reg
+    return None
+
 
 # Emergency transponder codes and what they mean.
 EMERGENCY_SQUAWKS = {

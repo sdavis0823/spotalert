@@ -702,12 +702,23 @@ def photo_debug(reg: str):
 
 
 @app.get("/api/photo-by-reg")
-def photo_by_reg(reg: str = "", type: str = ""):
+def photo_by_reg(reg: str = "", type: str = "", ident: str = ""):
     """Photo for a known tail number, independent of the AeroDataBox flight
     lookup (which the board already gave us the reg from, and which is flaky on
     the free tier). Real Planespotters photo if available, else the type
-    illustration slug so the card still shows a clean plane."""
+    illustration slug so the card still shows a clean plane.
+
+    When there's no reg but a flight number (e.g. a future intl arrival like
+    Starlux JX26), try the LIVE ADS-B feed: if the plane is airborne, its tail
+    is broadcasting and we can fetch the real photo of the actual airframe."""
     slug = type_art.resolve(None, type) if type else None
+    if not reg and ident:
+        try:
+            live = live_extras.tail_for_flight(ident)
+        except Exception:  # noqa: BLE001
+            live = None
+        if live:
+            reg = live
     pic = None
     if reg:
         try:
