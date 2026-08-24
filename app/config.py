@@ -81,7 +81,7 @@ FA_AIRPORT_SCAN_INTERVAL_SEC = int(os.environ.get("FA_AIRPORT_SCAN_INTERVAL_SEC"
 FA_RATE_PER_MIN = int(os.environ.get("FA_RATE_PER_MIN", "5"))
 # How many pages (~15 flights each) of scheduled arrivals to page through for
 # look-ahead. More pages = further ahead but more queries. 8 ≈ ~10 hours ahead.
-FA_SCHED_PAGES = int(os.environ.get("FA_SCHED_PAGES", "8"))
+FA_SCHED_PAGES = int(os.environ.get("FA_SCHED_PAGES", "5"))
 # "Deep scan" (manual, on-demand) — pages a full next-day window so no special
 # livery scheduled tomorrow is missed. Costs more queries, but user-triggered
 # and still guarded by the hard monthly cap, so it can never cause a charge.

@@ -13,7 +13,7 @@ Endpoints
 import time
 import os
 import re
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
@@ -512,11 +512,22 @@ def upcoming(icao: str):
             "flightaware": fa_mod.FlightAwareSource().available()}
 
 
+def _deep_scan_job(airports):
+    """Background full-day sweep — paced by the rate limiter (a few minutes),
+    then dispatch notifications for anything notable it turned up."""
+    fa_mod.run_deep_scan(airports)
+    try:
+        notify.dispatch_new()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @app.post("/api/flightaware/scan")
-def flightaware_scan(airport: str | None = None, deep: bool = False):
-    """Manual 'Scan now' — combined FlightAware scan (pre-takeoff, departures,
-    enroute ETAs, diversions, cancellations). One AeroAPI query per airport.
-    Pass ?airport=ICAO to scan just one and spend a single query."""
+def flightaware_scan(background: BackgroundTasks, airport: str | None = None, deep: bool = False):
+    """Manual 'Scan now'. Quick scan = a few pages of the next several hours,
+    returned synchronously. Deep scan = a full next-day sweep that runs in the
+    BACKGROUND over a few minutes (paced to the free tier's 5-queries/min limit)
+    so no scheduled special livery is missed; poll /api/flightaware/scan/status."""
     src = fa_mod.FlightAwareSource()
     if not src.available():
         return {"ok": False, "note": "FlightAware key not set — add FLIGHTAWARE_API_KEY to enable pre-takeoff alerts."}
@@ -528,18 +539,36 @@ def flightaware_scan(airport: str | None = None, deep: bool = False):
     else:
         with db.get_conn() as conn:
             airports = [r["icao"] for r in conn.execute("SELECT icao FROM airports").fetchall()]
-    pages = config.FA_DEEP_PAGES if deep else config.FA_SCHED_PAGES
+
+    if deep:
+        if fa_mod.deep_status().get("running"):
+            return {"ok": True, "deep": True, "started": False, "already_running": True,
+                    "note": "A deep scan is already running — it fills the board in over a few minutes.",
+                    "budget_remaining": fa_mod.budget_remaining()}
+        background.add_task(_deep_scan_job, airports)
+        return {"ok": True, "deep": True, "started": True,
+                "note": "Deep scan started — the full next day fills in over the next few minutes. "
+                        "Leave this open; the board refreshes as flights arrive.",
+                "budget_remaining": fa_mod.budget_remaining()}
+
+    # quick synchronous scan
     total = 0
     scanned = 0
     for ap in airports:
         if not src.budget_ok():
             break
-        total += fa_mod.scan_airport_flights(ap, pages=pages)["new_alerts"]
+        total += fa_mod.scan_airport_flights(ap, pages=config.FA_SCHED_PAGES)["new_alerts"]
         scanned += 1
     notify.dispatch_new()
     return {"ok": True, "new_alerts": total, "airports_scanned": scanned,
-            "deep": deep, "pages": pages,
+            "deep": False, "pages": config.FA_SCHED_PAGES,
             "budget_remaining": fa_mod.budget_remaining()}
+
+
+@app.get("/api/flightaware/scan/status")
+def flightaware_scan_status():
+    """Progress of a background deep scan (for the UI's 'filling in…' state)."""
+    return {**fa_mod.deep_status(), "budget_remaining": fa_mod.budget_remaining()}
 
 
 @app.get("/api/flightaware/debug/{icao}")

@@ -90,17 +90,35 @@ class FlightAwareSource:
         """Return upcoming scheduled arrivals for an airport (not yet departed).
 
         start/end are ISO-8601 UTC strings to widen the look-ahead window.
-        Each page (~15 flights) counts as one AeroAPI query.
+
+        We fetch ONE page per request and follow AeroAPI's `links.next` cursor
+        ourselves, so each page passes through the per-minute rate limiter. This
+        keeps deep look-aheads (many pages) under the free tier's 5-queries/min
+        cap instead of bursting past it (server-side max_pages would 429).
         """
-        params = {"max_pages": max_pages}
+        import urllib.parse as _up
+        base = {"max_pages": 1}
         if start:
-            params["start"] = start
+            base["start"] = start
         if end:
-            params["end"] = end
-        data = self._get(f"/airports/{airport_icao}/flights/scheduled_arrivals", params)
-        if not data:
-            return []
-        return [_parse_flight(f) for f in data.get("scheduled_arrivals", [])]
+            base["end"] = end
+        out: list[dict] = []
+        cursor = None
+        for _ in range(max(1, max_pages)):
+            params = dict(base)
+            if cursor:
+                params["cursor"] = cursor
+            data = self._get(f"/airports/{airport_icao}/flights/scheduled_arrivals", params)
+            if not data:
+                break  # error / rate-limit / budget stop — return what we have
+            out.extend(_parse_flight(f) for f in data.get("scheduled_arrivals", []))
+            nxt = (data.get("links") or {}).get("next")
+            if not nxt:
+                break  # no more pages
+            cursor = _up.parse_qs(_up.urlparse(nxt).query).get("cursor", [None])[0]
+            if not cursor:
+                break
+        return out
 
 
     def _get(self, path: str, params: dict | None = None) -> dict | None:
@@ -418,6 +436,42 @@ def _emit_alert(conn, airport_icao, icao24, direction, ident, event_time,
         (airport_icao, icao24, direction, ident, int(event_time), "red",
          reason, 0, now, eta_minutes))
     return True
+
+
+# ---- deep-scan progress (a full-day sweep runs in the background over minutes,
+# paced by the 5/min rate limiter) so the UI can show "filling in…" status ----
+_DEEP_STATUS = {"running": False, "airport": None, "started": 0,
+                "new_alerts": 0, "done_airports": 0, "total_airports": 0, "finished": 0}
+
+
+def deep_status() -> dict:
+    return dict(_DEEP_STATUS)
+
+
+def run_deep_scan(airports: list[str]) -> int:
+    """Blocking full-day sweep of each airport (call from a background thread).
+    Each page is rate-limited, so this can take a few minutes — that's expected.
+    Updates _DEEP_STATUS as it goes and writes results into scheduled_flights."""
+    global _DEEP_STATUS
+    _DEEP_STATUS = {"running": True, "airport": airports[0] if airports else None,
+                    "started": int(time.time()), "new_alerts": 0,
+                    "done_airports": 0, "total_airports": len(airports), "finished": 0}
+    total = 0
+    try:
+        for ap in airports:
+            _DEEP_STATUS["airport"] = ap
+            if not FlightAwareSource().budget_ok():
+                break
+            try:
+                total += scan_airport_flights(ap, pages=config.FA_DEEP_PAGES).get("new_alerts", 0)
+            except Exception:  # noqa: BLE001
+                pass
+            _DEEP_STATUS["new_alerts"] = total
+            _DEEP_STATUS["done_airports"] += 1
+    finally:
+        _DEEP_STATUS["running"] = False
+        _DEEP_STATUS["finished"] = int(time.time())
+    return total
 
 
 def scan_airport_flights(airport_icao: str, pages: int | None = None) -> dict:
