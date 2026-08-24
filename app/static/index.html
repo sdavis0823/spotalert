@@ -657,10 +657,13 @@ async function openFlightDetail(ds){
     const d=await j('/api/flight/detail?ident='+encodeURIComponent(ds.ident));
     if(d&&d.ok){
       const ph=box.querySelector('.fl-photo');
-      if(d.image_url){const img=new Image();img.className='fl-photo';img.src=d.image_url;img.alt='aircraft';
-        img.onclick=()=>d.image_link&&window.open(d.image_link,'_blank');ph.replaceWith(img);
-        if(d.image_credit){const c=document.createElement('div');c.className='fl-credit';c.textContent='photo © '+d.image_credit;img.after(c);}}
-      else{ph.textContent='No photo for this aircraft';}
+      if(d.image_url){const img=new Image();img.className='fl-photo'+(d.image_is_art?' art':'');img.src=d.image_url;img.alt='aircraft';
+        if(!d.image_is_art)img.onclick=()=>d.image_link&&window.open(d.image_link,'_blank');
+        ph.replaceWith(img);
+        const c=document.createElement('div');c.className='fl-credit';
+        c.textContent=d.image_is_art?('Illustration · '+(d.model||d.type||'aircraft type')):(d.image_credit?'photo © '+d.image_credit:'');
+        if(c.textContent)img.after(c);}
+      else{ph.textContent='No image for this aircraft';}
       if(d.status)$("#flStatus").textContent=d.status;
       // add reg / gate cells
       const grid=box.querySelector('.fl-grid');
@@ -705,7 +708,7 @@ async function loadWx(){
   try{const w=await j('/api/weather/'+ap);
     if(!w.ok){el.style.display='none';return;}
     el.style.display='flex';
-    const rwy=w.active_runway?`<span class="rwy">Rwy ${w.active_runway}</span>`:'';
+    const rwy=w.active_runway?`<span class="rwy">${w.runway_flow?w.runway_flow[0].toUpperCase()+w.runway_flow.slice(1)+'-bound · ':''}Rwy ${w.active_runway}</span>`:'';
     const cat=w.flight_category?`<span class="cat ${w.flight_category}">${w.flight_category}</span>`:'';
     const mph=k=>Math.round((k||0)*1.15078);
     const f=c=>Math.round(c*9/5+32);
