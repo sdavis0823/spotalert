@@ -169,4 +169,103 @@ def airport_weather(icao: str) -> dict:
         "active_runway": rwy,       # real runway end(s), only for known airports
         "runway_flow": flow,        # plain-language: "west", "east", etc.
         "flight_category": m.get("fltCat"),  # VFR/MVFR/IFR/LIFR
+        "delay": airport_status(icao),  # FAA ground stop / delay chip (US only)
     }
+
+
+# ---- FAA airport operational status (ground stops / delays) ----------------
+# One nationwide feed (free, no key). We cache it briefly so a busy board doesn't
+# hammer the FAA. US airports only — the feed uses IATA codes (PHX, not KPHX).
+_FAA_URL = "https://nasstatus.faa.gov/api/airport-events"
+_FAA_CACHE = {"at": 0, "by_iata": None}
+
+
+def _iata_of(icao: str):
+    """IATA code for airports the FAA ASWS feed covers (US only). Returns None
+    for everything else so the delay chip hides instead of implying coverage.
+
+    For contiguous-US K-airports the IATA is the ICAO minus the leading 'K'
+    (KPHX->PHX). Alaska/Hawaii/territories (P*, T*) have no clean strip rule, so
+    a small map handles the busy ones and the rest fall through to None."""
+    icao = (icao or "").upper().strip()
+    if len(icao) == 4 and icao[0] == "K":
+        return icao[1:]
+    return _NONK_US.get(icao)   # HNL, ANC, etc.
+
+
+# Non-K US airports the FAA covers, ICAO -> IATA (extend as needed).
+_NONK_US = {
+    "PHNL": "HNL", "PHOG": "OGG", "PHKO": "KOA", "PHTO": "ITO", "PHLI": "LIH",
+    "PANC": "ANC", "PAFA": "FAI", "PAJN": "JNU", "TJSJ": "SJU", "PGUM": "GUM",
+}
+
+
+def _faa_events():
+    """All current FAA airport events, keyed by IATA. Cached ~90s."""
+    import time
+    now = time.time()
+    if _FAA_CACHE["by_iata"] is not None and now - _FAA_CACHE["at"] < 90:
+        return _FAA_CACHE["by_iata"]
+    by = {}
+    try:
+        with httpx.Client(timeout=12) as c:
+            r = c.get(_FAA_URL, headers={"Accept": "application/json"})
+            r.raise_for_status()
+            data = r.json()
+        for ev in (data or []):
+            aid = (ev.get("airportId") or "").upper()
+            if aid:
+                by[aid] = ev
+    except (httpx.HTTPError, ValueError, TypeError):
+        by = _FAA_CACHE["by_iata"] or {}   # keep last good on a blip
+    _FAA_CACHE["by_iata"] = by
+    _FAA_CACHE["at"] = now
+    return by
+
+
+def airport_status(icao: str) -> dict:
+    """Compact operational status for the weather strip's delay chip.
+
+    Returns {ok, level, label, detail}. level is 'ontime' | 'minor' | 'major'.
+    'ok' is False for airports the FAA doesn't cover (non-US) so the UI can hide
+    the chip rather than imply everything is fine."""
+    iata = _iata_of(icao)
+    if not iata:
+        return {"ok": False}
+    ev = _faa_events().get(iata)
+    # Absent from the feed => FAA has no active program for it => running normally
+    if ev is None:
+        return {"ok": True, "level": "ontime", "label": "On time", "detail": None}
+
+    gs = ev.get("groundStop") or None
+    gd = ev.get("groundDelay") or None
+    clo = ev.get("airportClosure") or None
+    arr = ev.get("arrivalDelay") or None
+    dep = ev.get("departureDelay") or None
+
+    def _avg(d):
+        v = (d or {}).get("avgDelay") or (d or {}).get("averageDelay")
+        return str(v).strip() if v else None
+
+    if clo:
+        return {"ok": True, "level": "major", "label": "Airport closed",
+                "detail": (clo.get("simpleText") or clo.get("freeForm") or "")[:120] or None}
+    if gs:
+        cond = gs.get("impactingCondition") or gs.get("reason")
+        return {"ok": True, "level": "major", "label": "Ground stop",
+                "detail": (cond or "")[:120] or None}
+    if gd:
+        avg = _avg(gd)
+        cond = gd.get("impactingCondition") or gd.get("reason")
+        lab = f"Ground delay{(' ~' + avg) if avg else ''}"
+        return {"ok": True, "level": "major", "label": lab,
+                "detail": (cond or "")[:120] or None}
+    if dep or arr:
+        which = "Departures" if dep else "Arrivals"
+        d = dep or arr
+        avg = _avg(d)
+        cond = (d or {}).get("reason")
+        lab = f"{which} delayed{(' ~' + avg) if avg else ''}"
+        return {"ok": True, "level": "minor", "label": lab,
+                "detail": (cond or "")[:120] or None}
+    return {"ok": True, "level": "ontime", "label": "On time", "detail": None}
