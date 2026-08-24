@@ -241,6 +241,34 @@
     overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .airport-bar .chev{color:var(--faint);font-size:13px;flex-shrink:0}
   @media(max-width:640px){.airport-bar{min-width:100%}}
+  /* modern button polish */
+  button.primary,button.ghost{border-radius:12px;font-weight:700;transition:.14s;letter-spacing:-.01em}
+  button.primary{box-shadow:0 2px 8px -2px rgba(47,111,224,.5)}
+  button.primary:active,button.ghost:active{transform:translateY(1px)}
+  .airline-pick{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:10px;
+    background:var(--surface);padding:0 10px;height:38px}
+  .airline-pick select{border:none;background:transparent;font:700 13px var(--sans);color:#16234d;padding:0;height:36px;outline:none}
+  .airline-pick label{font:800 10px/1 var(--sans);text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  /* tap-a-plane detail card */
+  .fl-card{background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg);width:100%;max-width:460px;
+    overflow:hidden;display:flex;flex-direction:column;max-height:88vh}
+  .fl-photo{width:100%;height:200px;object-fit:cover;background:var(--surface2);display:block}
+  .fl-photo.ph{display:grid;place-items:center;color:var(--faint);font:600 13px var(--sans);text-align:center;height:140px}
+  .fl-body{padding:18px 20px 20px;overflow-y:auto}
+  .fl-title{font:800 22px/1.1 var(--sans);color:#16234d;letter-spacing:-.01em}
+  .fl-sub{color:var(--dim);font:600 14px var(--sans);margin-top:4px}
+  .fl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+  .fl-cell{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .fl-cell .k{font:800 10px/1 var(--sans);text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .fl-cell .v{font:700 15px var(--sans);color:#16234d;margin-top:5px}
+  .fl-credit{font-size:10px;color:var(--faint);margin-top:8px;text-align:right}
+  .fl-links{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .fl-links a{flex:1;text-align:center;background:#2f6fe0;color:#fff;border-radius:11px;padding:11px;
+    font:700 13.5px var(--sans);text-decoration:none;min-width:120px}
+  .fl-links a.alt{background:var(--surface2);color:#16234d;border:1px solid var(--line2)}
+  .fl-x{position:absolute;top:12px;right:14px;background:rgba(0,0,0,.45);color:#fff;width:30px;height:30px;
+    border-radius:50%;display:grid;place-items:center;cursor:pointer;font-size:16px;z-index:2}
+  .jt-row{cursor:pointer}
   .pill.fa{background:#eef4ff;border:1px solid #cfe0fb;color:#2f6fe0;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:999px;font-weight:700}
   .pill.fa.low{background:#fdf6e3;border-color:#f0e0b0;color:#b8860b}
   .pill.fa.out{background:#fdeef0;border-color:#f3c7cb;color:#c81e2a}
@@ -318,6 +346,7 @@
     <select id="airport" style="display:none"></select>
     <button class="ghost" id="apAdd" style="display:none">＋ Add airport</button>
     <span id="daytabs" class="daytabs"></span>
+    <span class="airline-pick"><label>Airline</label><select id="airlinePick"><option value="">All</option></select></span>
     <select id="hours" style="display:none"><option value="72" selected>72h</option></select>
     <select id="filter" style="display:none"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
     <button class="primary" id="refresh" style="display:none">↻ Run cycle now</button>
@@ -376,6 +405,13 @@
       <select id="apState" style="display:none"><option value="">▾ All states / regions</option></select>
     </div>
     <div id="apResults" class="ap-results"></div>
+  </div>
+</div>
+
+<div id="flModal" class="modal">
+  <div class="fl-card" style="position:relative">
+    <span class="fl-x" id="flClose">✕</span>
+    <div id="flContent"></div>
   </div>
 </div>
 
@@ -454,7 +490,11 @@ function evRow(e){
     (faIdent?`<a href="https://flightaware.com/live/flight/${faIdent}" target="_blank" rel="noopener">Details</a>`:'')+
     `<span class="tagbtn2" title="Mark as special livery" onclick="event.stopPropagation();tagLivery('${e.icao24||''}','${(reg||'').replace(/'/g,'')}','${(name||'').replace(/'/g,'')}')">✦ Tag</span>`+
     `</div>`;
-  return `<div class="jt-row ${jtTint(e)}">
+  const esc=s=>(s||'').toString().replace(/"/g,'&quot;');
+  return `<div class="jt-row ${jtTint(e)}" onclick="rowTap(event,this)"
+      data-ident="${esc(flight||reg)}" data-name="${esc(name)}" data-type="${esc(type)}"
+      data-op="${esc(e.operator)}" data-reg="${esc(reg)}" data-route="${esc(code)}"
+      data-dir="${esc(d)}" data-time="${esc(jtTime(e.event_time))}" data-status="${esc(jtStatus(e))}">
     <div class="jt-l">
       <div class="jt-time">${jtTime(e.event_time)}<span class="ar">${arrow}</span></div>
       <div class="jt-logo">${logo||'&nbsp;'}</div>
@@ -498,8 +538,10 @@ function renderCatbar(){                         // renders the JetTip filter pa
     if(TAB==='board')loadBoard().then(loadPhotos); else if(TAB==='alerts')loadAlerts().then(loadPhotos);
   });
 }
+let AIRLINEF="";
 function catVisible(e){
   const now=Date.now()/1000, T=(e.type||'').toUpperCase();
+  if(AIRLINEF&&(e.operator||'')!==AIRLINEF)return false;
   if(JTF.interest==='notable'&&!isNotableEv(e))return false;
   if(JTF.interest==='high'&&!(e.priority==='red'||e.notable||['special','military','gov'].includes(e.category)))return false;
   if(JTF.interest==='low'&&e.priority!=='blue')return false;
@@ -538,7 +580,7 @@ async function loadBoard(){
   const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+DAYSEL);
   const from=Math.floor(d.getTime()/1000), to=from+86400;
   const data=await j(`/api/board/${ap}?notable_only=false&day_from=${from}&day_to=${to}`);
-  renderCatbar(); renderDayTabs();
+  renderCatbar(); renderDayTabs(); fillAirlinePicker(data.events);
   const events=data.events.filter(e=>catVisible(e));
   const red=events.filter(e=>e.priority==='red').length,blue=events.filter(e=>e.priority==='blue').length,blk=events.filter(e=>e.is_blocked).length;
   $("#stat").innerHTML=`<div><b>${events.length}</b><span>events shown</span></div>
@@ -575,6 +617,64 @@ async function tagLivery(icao24, reg, tail){
     if(r&&(r.ok||r.icao24||r.tagged)){ event&&event.target&&(event.target.textContent="✓ tagged",event.target.classList.add("done")); }
     else alert("Couldn't tag: "+(r.detail||JSON.stringify(r)));
   }catch(e){ alert("Tag failed: "+e.message); }
+}
+// ---- tap-a-plane detail card ----
+function rowTap(ev,el){
+  if(ev.target.closest('a,.tagbtn2'))return;   // let links/tag do their thing
+  openFlightDetail(el.dataset);
+}
+function closeFl(){$("#flModal").classList.remove("on");}
+async function openFlightDetail(ds){
+  const box=$("#flContent"); if(!box)return;
+  const isArr=(ds.dir==='scheduled'||ds.dir==='arrival'||ds.dir==='enroute'||ds.dir==='inbound');
+  const routeLabel=isArr?`from ${ds.route||'—'}`:`to ${ds.route||'—'}`;
+  // instant prefill from the row, photo loads after
+  box.innerHTML=`
+    <div class="fl-photo ph">Loading photo…</div>
+    <div class="fl-body">
+      <div class="fl-title">${ds.name||ds.ident||'Flight'}</div>
+      <div class="fl-sub">${[ds.op,ds.ident].filter(Boolean).join(' · ')} · ${routeLabel}</div>
+      <div class="fl-grid">
+        <div class="fl-cell"><div class="k">Aircraft</div><div class="v">${ds.type||'—'}</div></div>
+        <div class="fl-cell"><div class="k">${isArr?'Scheduled in':'Scheduled out'}</div><div class="v">${ds.time||'—'}</div></div>
+        <div class="fl-cell"><div class="k">${isArr?'From':'To'}</div><div class="v">${ds.route||'—'}</div></div>
+        <div class="fl-cell"><div class="k">Status</div><div class="v" id="flStatus">${ds.status||'—'}</div></div>
+      </div>
+      <div class="fl-links" id="flLinks"></div>
+    </div>`;
+  $("#flModal").classList.add("on");
+  const idl=(ds.ident||'').toLowerCase();
+  const links=$("#flLinks");
+  if(links)links.innerHTML=
+    (ds.ident?`<a href="https://www.flightradar24.com/data/flights/${encodeURIComponent(idl)}" target="_blank" rel="noopener">Track on FR24</a>`:'')+
+    (ds.ident?`<a class="alt" href="https://flightaware.com/live/flight/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">FlightAware</a>`:'');
+  if(!ds.ident)return;
+  try{
+    const d=await j('/api/flight/detail?ident='+encodeURIComponent(ds.ident));
+    if(d&&d.ok){
+      const ph=box.querySelector('.fl-photo');
+      if(d.image_url){const img=new Image();img.className='fl-photo';img.src=d.image_url;img.alt='aircraft';
+        img.onclick=()=>d.image_link&&window.open(d.image_link,'_blank');ph.replaceWith(img);
+        if(d.image_credit){const c=document.createElement('div');c.className='fl-credit';c.textContent='photo © '+d.image_credit;img.after(c);}}
+      else{ph.textContent='No photo for this aircraft';}
+      if(d.status)$("#flStatus").textContent=d.status;
+      // add reg / gate cells
+      const grid=box.querySelector('.fl-grid');
+      const extra=[];
+      if(d.registration)extra.push(['Tail #',d.registration]);
+      const gate=isArr?(d.arr_gate||d.arr_terminal):(d.dep_gate||d.dep_terminal);
+      if(gate)extra.push([isArr?'Arr gate':'Dep gate',gate]);
+      extra.forEach(([k,v])=>{const c=document.createElement('div');c.className='fl-cell';
+        c.innerHTML=`<div class="k">${k}</div><div class="v">${v}</div>`;grid.appendChild(c);});
+    }
+  }catch(e){ const ph=box.querySelector('.fl-photo'); if(ph)ph.textContent='No live detail available'; }
+}
+function fillAirlinePicker(events){
+  const sel=$("#airlinePick"); if(!sel)return;
+  const cur=sel.value;
+  const ops=[...new Set(events.map(e=>e.operator).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">All airlines</option>'+ops.map(o=>`<option value="${o.replace(/"/g,'')}" ${o===cur?'selected':''}>${o}</option>`).join('');
+  sel.onchange=()=>{AIRLINEF=sel.value;if(TAB==='board')loadBoard().then(loadPhotos);};
 }
 async function loadGuide(){
   const d=await j('/api/typeguide'); const types=d.types||[];
@@ -1024,6 +1124,7 @@ function wireApModal(){
   $("#apAdd").onclick=apOpenModal;
   $("#apClose").onclick=apCloseModal;
   $("#apModal").onclick=e=>{if(e.target.id==="apModal")apCloseModal();};
+  {const fx=$("#flClose");if(fx)fx.onclick=closeFl;const fm=$("#flModal");if(fm)fm.onclick=e=>{if(e.target.id==="flModal")closeFl();};}
   $("#apSearch").oninput=e=>{
     clearTimeout(apTimer);
     const q=e.target.value.trim();
