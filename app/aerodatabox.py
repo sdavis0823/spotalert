@@ -107,9 +107,11 @@ def _parse(fl, direction):
 def fetch_schedule(icao: str, hours: int = 72):
     """(arrivals, departures) parsed flight dicts across the next `hours`."""
     now = int(time.time())
+    # start ~20h in the past so the current day is complete (and the UTC-vs-local
+    # window offset never clips early-morning flights), out to `hours` ahead.
     end = now + hours * 3600
     arrivals, departures = [], []
-    t = now
+    t = now - 20 * 3600
     first = True
     while t < end:
         chunk_end = min(t + 12 * 3600, end)

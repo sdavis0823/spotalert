@@ -245,7 +245,7 @@ def _store_scheduled_board(conn, airport_icao, arrivals, departures, now, horizo
     rows = []
 
     def _row(fl, direction, when):
-        if not when or when < now - 1800 or when > horizon:
+        if not when or when < now - 20 * 3600 or when > horizon:
             return None
         ac = _notable_for_flight(fl)
         reg = fl.get("registration")

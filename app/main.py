@@ -108,20 +108,21 @@ def _route_code_from_reason(reason, airport_icao):
     return _iata_ish(w.group(1).upper()) if w else None
 
 
-def _scheduled_board_events(conn, icao, now):
-    """The FULL upcoming board from the scheduled-flight cache — every arrival &
-    departure FlightAware returned, notable or not (JetTip's 'everything coming
-    in'). Notable rows carry a category/tags so the UI highlights them; the
-    right-hand code is the endpoint that isn't this airport."""
+def _scheduled_board_events(conn, icao, since, until):
+    """The FULL board from the scheduled-flight cache for a time window — every
+    arrival & departure, notable or not (JetTip's 'everything coming in'),
+    INCLUDING flights earlier in the day (past), so a day tab shows the whole day
+    midnight-to-midnight. Notable rows carry a category/tags for highlighting."""
     ap = {icao.upper(), icao.upper().lstrip("K")}
 
     def _code(c):
         return _iata_ish(c) if c else None
 
     rows = conn.execute(
-        """SELECT * FROM scheduled_flights WHERE airport_icao=? AND event_time > ?
-           ORDER BY event_time ASC LIMIT 400""",
-        (icao, now - 1800)).fetchall()
+        """SELECT * FROM scheduled_flights WHERE airport_icao=?
+             AND event_time >= ? AND event_time < ?
+           ORDER BY event_time ASC LIMIT 2500""",
+        (icao, since, until)).fetchall()
     out = []
     for r in rows:
         # far endpoint: origin for arrivals, destination for departures
@@ -233,14 +234,22 @@ def _tracked_set() -> set[str]:
 @app.get("/api/board/{icao}")
 def board(icao: str, hours: int = Query(48, ge=1, le=720),
           direction: str | None = None, category: str | None = None,
-          notable_only: bool = False):
+          notable_only: bool = False,
+          day_from: int | None = None, day_to: int | None = None):
+    """When day_from/day_to (epoch seconds) are given, the board shows that
+    whole calendar day — every flight from midnight to midnight, past included —
+    which is what a day tab needs. Otherwise it falls back to the trailing
+    `hours` window."""
     icao = icao.upper()
-    since = int(time.time()) - hours * 3600
+    now = int(time.time())
+    win_from = day_from if day_from else now - hours * 3600
+    win_to = day_to if day_to else now + 72 * 3600
+    since = win_from
     with db.get_conn() as conn:
         if not _airport_row(conn, icao):
             raise HTTPException(404, f"Airport {icao} not covered")
-        q = "SELECT * FROM visits WHERE airport_icao=? AND event_time>=?"
-        params = [icao, since]
+        q = "SELECT * FROM visits WHERE airport_icao=? AND event_time>=? AND event_time<?"
+        params = [icao, win_from, win_to]
         if direction in ("arrival", "departure"):
             q += " AND direction=?"
             params.append(direction)
@@ -262,10 +271,9 @@ def board(icao: str, hours: int = Query(48, ge=1, le=720),
             e["route_code"] = None      # live ADS-B rows carry no route
             out.append(e)
 
-        # merge upcoming FlightAware scheduled rows (they carry the route code)
-        now = int(time.time())
+        # merge scheduled rows for the same window (they carry the route code)
         seen = {(e["icao24"], e["direction"], e["event_time"]) for e in out}
-        for se in _scheduled_board_events(conn, icao, now):
+        for se in _scheduled_board_events(conn, icao, win_from, win_to):
             if notable_only and not se.get("notable"):
                 continue
             key = (se["icao24"], se["direction"], se["event_time"])
