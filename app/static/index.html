@@ -1026,13 +1026,26 @@ async function init(){
   const fd=$("#faDeep");
   if(fd)fd.onclick=async()=>{
     const ap=$("#airport").value;
-    if(!confirm(`Deep scan ${ap} for the full next day?\n\nThis pages the whole day's schedule so no special livery is missed. It uses more FlightAware queries than a quick scan — your hard monthly cap still protects you from any charge.`)) return;
-    fd.textContent="Deep scanning…";fd.disabled=true;
+    if(!confirm(`Deep scan ${ap} for the full next day?\n\nThe free plan only allows 5 lookups a minute, so this fetches the whole day steadily in the BACKGROUND over a few minutes and fills the board in as it goes. Leave the app open. Your monthly cap still protects you from any charge.`)) return;
     const r=await j(`/api/flightaware/scan?airport=${ap}&deep=true`,{method:"POST"});
-    fd.textContent="🔎 Deep scan (full day)";fd.disabled=false;
-    if(!r.ok){alert(r.note||"Deep scan unavailable.");}
-    else{alert(`Deep scan done (${r.pages} pages).\nNew special/notable alerts: ${r.new_alerts}\nQueries left this month: ${r.budget_remaining}`);}
-    loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
+    if(!r.ok){alert(r.note||"Deep scan unavailable.");return;}
+    fd.disabled=true;
+    // poll progress; refresh the board as flights fill in
+    let ticks=0;
+    const poll=setInterval(async()=>{
+      ticks++;
+      let s={}; try{s=await j('/api/flightaware/scan/status');}catch(e){}
+      if(s.running){
+        fd.textContent=`Deep scanning… (${s.new_alerts||0} special so far)`;
+        if(TAB==="board")loadBoard().then(loadPhotos);
+      }else{
+        clearInterval(poll); fd.disabled=false; fd.textContent="🔎 Deep scan (full day)";
+        loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
+        alert(`Deep scan finished.\nSpecial/notable aircraft found: ${s.new_alerts||0}\nQueries left this month: ${s.budget_remaining}`);
+      }
+      if(ticks>60){clearInterval(poll); fd.disabled=false; fd.textContent="🔎 Deep scan (full day)";}
+    },5000);
+    loadFaBudget();
   };
   loadScheduler();setInterval(loadScheduler,15000);
   loadFaBudget();
