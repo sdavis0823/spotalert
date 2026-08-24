@@ -58,20 +58,21 @@ _TAIL_TTL_MISS = 25       # a miss (not airborne yet) is retried sooner
 # that's outside the snapshot radius (e.g. still far offshore).
 _SNAP_CENTER = (33.4342, -112.0116)   # KPHX
 _SNAP_RADIUS = 250                    # nm (mirror max)
-_SNAP_TTL = 45
+# The bulk /point/ call is ~30s from a throttled datacenter IP, so the
+# background scheduler re-warms this every cycle (see scheduler.py) and we keep
+# it valid across the 5-min gap. A tail number never changes mid-flight, so a
+# few minutes of staleness is harmless; a flight outside the snapshot still has
+# the slow per-callsign fallback.
+_SNAP_TTL = 360
 _snap_cache = {"ts": 0.0, "map": {}}  # {CALLSIGN: REG}
 
 
-def _point_snapshot():
-    """callsign -> registration for everything airborne near the home field,
-    from one fast bulk /point/ query, cached briefly and shared across lookups."""
-    now = time.time()
-    if _snap_cache["map"] and now - _snap_cache["ts"] < _SNAP_TTL:
-        return _snap_cache["map"]
+def _fetch_snapshot_map():
+    """One bulk /point/ query around the home field -> {CALLSIGN: REG}, or {}."""
     lat, lon = _SNAP_CENTER
     for base in _ADSB_BASES:
         try:
-            with httpx.Client(timeout=10, headers={"User-Agent": _TAIL_UA}) as c:
+            with httpx.Client(timeout=12, headers={"User-Agent": _TAIL_UA}) as c:
                 r = c.get(f"{base}/point/{lat}/{lon}/{_SNAP_RADIUS}")
                 if r.status_code != 200:
                     continue
@@ -87,8 +88,28 @@ def _point_snapshot():
             if cs and reg:
                 m[cs] = reg
         if m:
-            _snap_cache.update(ts=now, map=m)
             return m
+    return {}
+
+
+def warm_snapshot():
+    """Force-refresh the snapshot (called from the background scheduler so a
+    user never pays the ~30s build). Safe to call often; no-op on empty fetch."""
+    m = _fetch_snapshot_map()
+    if m:
+        _snap_cache.update(ts=time.time(), map=m)
+    return len(_snap_cache["map"])
+
+
+def _point_snapshot():
+    """callsign -> registration for everything airborne near the home field,
+    from one cached bulk /point/ query, shared across lookups."""
+    if _snap_cache["map"] and time.time() - _snap_cache["ts"] < _SNAP_TTL:
+        return _snap_cache["map"]
+    m = _fetch_snapshot_map()
+    if m:
+        _snap_cache.update(ts=time.time(), map=m)
+        return m
     return _snap_cache["map"]  # stale is better than nothing
 
 
