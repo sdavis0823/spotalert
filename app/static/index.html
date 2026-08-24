@@ -231,6 +231,16 @@
   .jtf-seg button:hover{background:var(--surface2)}
   .jtf-seg button.on{background:#2f6fe0;color:#fff}
   @media(max-width:640px){.jtf-lbl{min-width:100%;margin-bottom:-4px} .jtf-seg{flex:1}}
+  /* prominent airport picker bar (the way in) */
+  .airport-bar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--line2);
+    border-radius:14px;padding:12px 18px;font-family:var(--sans);cursor:pointer;transition:.12s;
+    min-width:260px;flex:1;box-shadow:var(--shadow)}
+  .airport-bar:hover{border-color:var(--sky)}
+  .airport-bar .code{font-weight:800;font-size:22px;color:#16234d;letter-spacing:-.01em}
+  .airport-bar .nm{font-weight:600;font-size:13.5px;color:var(--dim);flex:1;min-width:0;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .airport-bar .chev{color:var(--faint);font-size:13px;flex-shrink:0}
+  @media(max-width:640px){.airport-bar{min-width:100%}}
   .pill.fa{background:#eef4ff;border:1px solid #cfe0fb;color:#2f6fe0;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:999px;font-weight:700}
   .pill.fa.low{background:#fdf6e3;border-color:#f0e0b0;color:#b8860b}
   .pill.fa.out{background:#fdeef0;border-color:#f3c7cb;color:#c81e2a}
@@ -304,8 +314,9 @@
 </header>
 <div class="wrap">
   <div class="controls" id="boardControls">
-    <label class="muted">Airport</label><select id="airport"></select>
-    <button class="ghost" id="apAdd" title="Search every airport worldwide">＋ Add airport</button>
+    <button class="airport-bar" id="apBar" title="Choose an airport"><span class="code" id="apBarCode">—</span><span class="nm" id="apBarName">Choose an airport…</span><span class="chev">▾</span></button>
+    <select id="airport" style="display:none"></select>
+    <button class="ghost" id="apAdd" style="display:none">＋ Add airport</button>
     <span id="daytabs" class="daytabs"></span>
     <select id="hours" style="display:none"><option value="72" selected>72h</option></select>
     <select id="filter" style="display:none"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
@@ -979,19 +990,31 @@ async function apSelect(icao,el){
   apCloseModal();
   if(TAB==="board")loadBoard().then(loadPhotos);
 }
+function updateApBar(){
+  const sel=$("#airport"); if(!sel||!$("#apBarCode"))return;
+  const opt=sel.options[sel.selectedIndex]; if(!opt){return;}
+  const parts=opt.textContent.split(/[—-]/);
+  $("#apBarCode").textContent=(parts[0]||'').trim().replace(/^K([A-Z]{3})$/,'$1');
+  $("#apBarName").textContent=(parts.slice(1).join('-')||'').trim();
+}
 async function refreshAirports(sel){
   AIRPORTS=await j("/api/airports");
   const cur=sel||$("#airport").value||(AIRPORTS[0]&&AIRPORTS[0].icao);
   $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}" ${a.icao===cur?'selected':''}>${a.icao} — ${a.name}</option>`).join("");
+  updateApBar();
 }
 let apTimer=null;
 function apOpenModal(){
   $("#apModal").classList.add("on");
   $("#apSearch").value="";$("#apSearch").focus();
-  $("#apResults").innerHTML=`<div class="ap-hint">Start typing to search 19,836 airports.</div>`;
+  // show YOUR airports first for quick switching, then search/browse
+  const mine=(AIRPORTS||[]).map(a=>({...a,tracked:true}));
+  if(mine.length)apRender(mine,"Search to add another airport.");
+  else $("#apResults").innerHTML=`<div class="ap-hint">Search 19,836 airports — by name, city, or code.</div>`;
 }
 function apCloseModal(){$("#apModal").classList.remove("on");}
 function wireApModal(){
+  const bar=$("#apBar"); if(bar)bar.onclick=apOpenModal;
   $("#apAdd").onclick=apOpenModal;
   $("#apClose").onclick=apCloseModal;
   $("#apModal").onclick=e=>{if(e.target.id==="apModal")apCloseModal();};
@@ -1050,9 +1073,10 @@ async function init(){
   const home=AIRPORTS.find(a=>a.icao==="KPHX")?"KPHX":(AIRPORTS[0]&&AIRPORTS[0].icao);
   RADAR.ap=home;
   $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}" ${a.icao===home?'selected':''}>${a.icao} — ${a.name}</option>`).join("");
+  updateApBar();
   wireApModal();
   document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-  ["airport","hours","filter"].forEach(id=>$("#"+id).onchange=()=>{if(TAB==="board")loadBoard().then(loadPhotos);});
+  ["airport","hours","filter"].forEach(id=>$("#"+id).onchange=()=>{updateApBar();if(TAB==="board")loadBoard().then(loadPhotos);});
   $("#refresh").onclick=async()=>{
     $("#refresh").textContent="Running…";$("#refresh").disabled=true;
     const r=await j("/api/refresh?hours=6",{method:"POST"});
