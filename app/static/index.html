@@ -254,7 +254,7 @@
     overflow:hidden;display:flex;flex-direction:column;max-height:88vh}
   .fl-photo{width:100%;height:200px;object-fit:cover;background:var(--surface2);display:block}
   .fl-photo.ph{display:grid;place-items:center;color:var(--faint);font:600 13px var(--sans);text-align:center;height:140px}
-  .fl-photo.art{object-fit:contain;padding:14px;background:var(--surface2)}
+  .fl-photo.art{object-fit:contain;height:200px;padding:12px;background:var(--surface2)}
   .fl-body{padding:18px 20px 20px;overflow-y:auto}
   .fl-title{font:800 22px/1.1 var(--sans);color:#16234d;letter-spacing:-.01em}
   .fl-sub{color:var(--dim);font:600 14px var(--sans);margin-top:4px}
@@ -664,6 +664,31 @@ function rowTap(ev,el){
   openFlightDetail(el.dataset);
 }
 function closeFl(){$("#flModal").classList.remove("on");}
+async function loadFlightPhoto(reg,type){
+  const box=$("#flContent"); const ph=box&&box.querySelector('.fl-photo'); if(!ph)return;
+  let d;
+  try{ d=await j('/api/photo-by-reg?reg='+encodeURIComponent(reg||'')+'&type='+encodeURIComponent(type||'')); }
+  catch(e){ ph.textContent='No image for this aircraft'; return; }
+  if(!d||!d.image_url){ ph.textContent='No image for this aircraft'; return; }
+  const img=new Image(); img.className='fl-photo'+(d.image_is_art?' art':''); img.alt='aircraft';
+  const c=document.createElement('div'); c.className='fl-credit';
+  const artLabel='Illustration · '+(type||'aircraft type');
+  const setCredit=()=>{c.textContent=img.classList.contains('art')?artLabel:(d.image_credit?'photo © '+d.image_credit:'');};
+  img.onload=()=>{  // a too-small real photo is swapped for the crisp illustration
+    if(!img.classList.contains('art')&&img.naturalWidth&&img.naturalWidth<300&&d.type_art){
+      img.classList.add('art');img.onclick=null;img.src=`/static/types/${d.type_art}.png`;setCredit();return;}
+    setCredit();
+  };
+  img.onerror=()=>{  // never a broken icon: fall back to illustration, then placeholder
+    if(!img.classList.contains('art')&&d.type_art){
+      img.classList.add('art');img.onclick=null;img.src=`/static/types/${d.type_art}.png`;setCredit();return;}
+    const p=document.createElement('div');p.className='fl-photo ph';p.textContent='No image for this aircraft';
+    img.replaceWith(p);if(c)c.remove();
+  };
+  if(!d.image_is_art)img.onclick=()=>d.image_link&&window.open(d.image_link,'_blank');
+  img.src=d.image_url;
+  ph.replaceWith(img); img.after(c);
+}
 async function openFlightDetail(ds){
   const box=$("#flContent"); if(!box)return;
   const isArr=(ds.dir==='scheduled'||ds.dir==='arrival'||ds.dir==='enroute'||ds.dir==='inbound');
@@ -688,35 +713,13 @@ async function openFlightDetail(ds){
   if(links)links.innerHTML=
     (ds.ident?`<a href="https://www.flightradar24.com/data/flights/${encodeURIComponent(ds.ident.toLowerCase())}" target="_blank" rel="noopener">Track on FR24</a>`:'')+
     (ds.ident?`<a class="alt" href="https://flightaware.com/live/flight/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">FlightAware</a>`:'');
+  // Photo loads from the tail number the board already gave us — independent of
+  // the (flaky, rate-limited) AeroDataBox flight lookup, so it shows reliably.
+  loadFlightPhoto(ds.reg, ds.type);
   if(!ds.ident)return;
   try{
     const d=await j('/api/flight/detail?ident='+encodeURIComponent(ds.ident));
     if(d&&d.ok){
-      const ph=box.querySelector('.fl-photo');
-      if(d.image_url){const img=new Image();img.className='fl-photo'+(d.image_is_art?' art':'');img.alt='aircraft';
-        const c=document.createElement('div');c.className='fl-credit';
-        const artLabel='Illustration · '+(d.model||d.type||'aircraft type');
-        const setCredit=()=>{c.textContent=img.classList.contains('art')?artLabel:(d.image_credit?'photo © '+d.image_credit:'');};
-        // Quality gate: a real photo that comes back too small to look good (e.g.
-        // a 150px thumbnail) is swapped for the crisp type illustration instead
-        // of being blurrily upscaled to fill the card.
-        img.onload=()=>{
-          if(!img.classList.contains('art')&&img.naturalWidth&&img.naturalWidth<300&&d.type_art){
-            img.classList.add('art');img.onclick=null;img.src=`/static/types/${d.type_art}.png`;setCredit();return;}
-          setCredit();
-        };
-        // If an image fails to load, fall back to the illustration; if that also
-        // fails (or there is none), show a clean placeholder — never a broken icon.
-        img.onerror=()=>{
-          if(!img.classList.contains('art')&&d.type_art){
-            img.classList.add('art');img.onclick=null;img.src=`/static/types/${d.type_art}.png`;setCredit();return;}
-          const p=document.createElement('div');p.className='fl-photo ph';p.textContent='No image for this aircraft';
-          img.replaceWith(p);if(c)c.remove();
-        };
-        if(!d.image_is_art)img.onclick=()=>d.image_link&&window.open(d.image_link,'_blank');
-        img.src=d.image_url;
-        ph.replaceWith(img);img.after(c);}
-      else{ph.textContent='No image for this aircraft';}
       if(d.status)$("#flStatus").textContent=d.status;
       // add reg / gate cells
       const grid=box.querySelector('.fl-grid');
