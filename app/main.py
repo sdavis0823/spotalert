@@ -675,16 +675,16 @@ def flight_detail(ident: str):
                 except Exception:  # noqa: BLE001
                     pic = None
                 if pic and (pic.get("thumbnail_large") or pic.get("thumbnail")):
+                    # Real per-tail photo from Planespotters (actual airframe).
                     d["image_url"] = pic.get("thumbnail_large") or pic.get("thumbnail")
                     d["image_credit"] = pic.get("photographer") or pic.get("credit")
                     d["image_link"] = pic.get("link")
                     d["image_is_art"] = False
-                elif adb_img:
-                    d["image_url"] = adb_img
-                    d["image_credit"] = adb_credit
-                    d["image_link"] = adb_link
-                    d["image_is_art"] = False
                 else:
+                    # No Planespotters photo. AeroDataBox's image is NOT the actual
+                    # airframe — it hands back one stock photo per airline (two
+                    # different 737s got the same picture), so we DON'T use it. A
+                    # clean labeled illustration is the honest fallback.
                     d["image_url"] = f"/static/types/{slug}.png" if slug else None
                     d["image_credit"] = None
                     d["image_link"] = None
