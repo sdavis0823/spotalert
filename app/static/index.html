@@ -702,8 +702,16 @@ async function openFlightDetail(ds){
         // of being blurrily upscaled to fill the card.
         img.onload=()=>{
           if(!img.classList.contains('art')&&img.naturalWidth&&img.naturalWidth<300&&d.type_art){
-            img.classList.add('art');img.onclick=null;img.src=`/types/${d.type_art}.png`;setCredit();return;}
+            img.classList.add('art');img.onclick=null;img.src=`/static/types/${d.type_art}.png`;setCredit();return;}
           setCredit();
+        };
+        // If an image fails to load, fall back to the illustration; if that also
+        // fails (or there is none), show a clean placeholder — never a broken icon.
+        img.onerror=()=>{
+          if(!img.classList.contains('art')&&d.type_art){
+            img.classList.add('art');img.onclick=null;img.src=`/static/types/${d.type_art}.png`;setCredit();return;}
+          const p=document.createElement('div');p.className='fl-photo ph';p.textContent='No image for this aircraft';
+          img.replaceWith(p);if(c)c.remove();
         };
         if(!d.image_is_art)img.onclick=()=>d.image_link&&window.open(d.image_link,'_blank');
         img.src=d.image_url;
