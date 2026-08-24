@@ -597,11 +597,23 @@ async function loadBoard(){
     <div><b style="color:var(--gold)">${blk}</b><span>blocked/notable frames</span></div>`;
   // ---- JetTip-style airport header / TODAY band / list / footer ----
   const sel=$("#airport"), opt=sel.options[sel.selectedIndex];
+  window.emptyBoardMsg=function(){
+    const future=DAYSEL>0, day=dayLabel(DAYSEL);
+    const wantsLivery=JTF.livery==='special', wantsBiz=JTF.notoriety==='private';
+    // Liveries and private jets are keyed to the tail number, which airlines
+    // don't assign until close to departure — so a future day genuinely can't
+    // show them yet. Explain that instead of looking broken.
+    if(future&&(wantsLivery||wantsBiz)){
+      const what=wantsLivery&&wantsBiz?'Special liveries and private jets':wantsLivery?'Special liveries':'Private jets';
+      return `${what} for ${day} aren’t available yet.<br><span style="font-size:12px;color:var(--faint)">They’re identified by an aircraft’s tail number, and airlines don’t assign tomorrow’s tails until close to departure. Check back on the day of the flight — that’s when they fill in. (The full ${day} schedule and airlines are already here; switch Livery/Notoriety back to “Any”.)</span>`;
+    }
+    return `Nothing scheduled for ${day} yet — tap “Load full day”, or ease the filters above.`;
+  };
   const label=opt?opt.textContent:ap;                 // "KPHX — Phoenix Sky Harbor"
   const mparts=label.split(/[—-]/);
   const apCode=(mparts[0]||ap).trim().replace(/^K([A-Z]{3})$/,'$1');
   const apName=(mparts.slice(1).join('-')||label).trim();
-  const rows=events.length?events.map(evRow).join(""):`<div class="empty" style="border-radius:0;border:none">Nothing scheduled for ${dayLabel(DAYSEL)} yet — tap “Load full day”, or ease the filters above.</div>`;
+  const rows=events.length?events.map(evRow).join(""):`<div class="empty" style="border-radius:0;border:none">${emptyBoardMsg()}</div>`;
   $("#board").innerHTML=`
    <div class="jt-wrap">
     <div class="jt-airport">
