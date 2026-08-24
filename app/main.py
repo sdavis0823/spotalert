@@ -652,7 +652,7 @@ def flight_detail(ident: str):
             # So when there's no reg, show a labeled type illustration instead.
             reg = d.get("registration")
             if not reg:
-                d["image_url"] = f"/types/{slug}.png" if slug else None
+                d["image_url"] = f"/static/types/{slug}.png" if slug else None
                 d["image_credit"] = None
                 d["image_link"] = None
                 d["image_is_art"] = bool(slug)
@@ -676,7 +676,7 @@ def flight_detail(ident: str):
                     # No fresh Planespotters photo. AeroDataBox's image carries no
                     # date and could be years old, so we DON'T show it — a clean,
                     # labeled illustration beats a stale photo.
-                    d["image_url"] = f"/types/{slug}.png" if slug else None
+                    d["image_url"] = f"/static/types/{slug}.png" if slug else None
                     d["image_credit"] = None
                     d["image_link"] = None
                     d["image_is_art"] = bool(slug)
