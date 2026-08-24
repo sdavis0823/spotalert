@@ -517,7 +517,7 @@ const JTFGROUPS=[
   {k:'hub',      label:'Hub airlines', opts:[['show','Show'],['hide','Hide']]},
   {k:'config',   label:'Configuration',opts:[['any','Any'],['pax','Pax'],['cargo','Cargo']]},
   {k:'livery',   label:'Livery',       opts:[['any','Any'],['special','Special']]},
-  {k:'notoriety',label:'Notoriety',    opts:[['any','Any'],['intl',"Int'l"],['heavy','Heavy'],['tri','Tri +'],['divert','Divert']]},
+  {k:'notoriety',label:'Notoriety',    opts:[['any','Any'],['private','Private jet'],['intl',"Int'l"],['heavy','Heavy'],['divert','Divert']]},
 ];
 const HUBS={KPHX:['american','southwest'],KLAX:['american','united','delta','southwest','spirit'],
             KIWA:['allegiant'],KDFW:['american'],KATL:['delta'],KDEN:['united','southwest','frontier']};
@@ -555,7 +555,11 @@ function catVisible(e){
   if(JTF.livery==='special'&&!(e.category==='special'||(e.interest_tags||[]).some(t=>/livery|retro|heritage/i.test(t))))return false;
   if(JTF.notoriety==='divert'&&e.direction!=='diversion')return false;
   if(JTF.notoriety==='heavy'&&!/A380|A350|A340|A330|A300|A310|747|777|767|787|A35|A34|A33|A38|B74|B76|B77|B78|MD11|MD-11|DC10|DC-10|ILYUSHIN|ANTONOV/i.test(T))return false;
-  if(JTF.notoriety==='tri'&&!/MD11|MD-11|DC10|DC-10|747|A340|L1011|L-1011|TRISTAR|ANTONOV|IL76|IL-76|IL96|IL-96|727/i.test(T))return false;
+  if(JTF.notoriety==='private'){
+    const isBiz=/GULFSTREAM|CITATION|LEARJET|CHALLENGER|GLOBAL|FALCON|PHENOM|LEGACY|PRAETOR|HAWKER|PILATUS|KING ?AIR|HONDAJET|VISION JET|EMBRAER PHENOM|GLEX|GLF|G[0-9]{3}\b|BEECHJET|NEXTANT/i.test(T)
+      ||e.category==='private'||(e.interest_tags||[]).includes('large-private');
+    if(!isBiz)return false;
+  }
   if(JTF.notoriety==='intl'){const op=(e.operator||'').toLowerCase();if(!op||US_CARRIERS.some(u=>op.includes(u)))return false;}
   return true;
 }
