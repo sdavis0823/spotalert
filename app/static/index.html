@@ -486,10 +486,11 @@ function evRow(e){
   const code=(e.origin||e.destination||e.route_code||'').toString().toUpperCase();
   const codeHtml=code?`<div class="jt-code">${code}</div>`:`<div class="jt-code none">—</div>`;
   const faIdent=encodeURIComponent(flight||reg||'');
-  // FR24 short-URL form (fr24.com/<flight|tail>) — this opens the FR24 APP on
-  // iOS/Android when installed (the long /data/ URLs open the browser instead).
-  // Prefer the flight number (callsign) since it triggers the app most reliably.
-  const frKey=flight||reg||'';
+  // FR24 short-URL form (fr24.com/<tail|flight>) — opens the FR24 APP on
+  // iOS/Android when installed. Prefer the TAIL NUMBER: FR24 resolves a
+  // registration reliably (straight to that airframe), whereas an IATA flight
+  // number like "AA6294" often fails to resolve ("Request failed").
+  const frKey=reg||flight||'';
   const fr=frKey?`https://fr24.com/${encodeURIComponent(frKey)}`:'';
   const links=`<div class="jt-links">`+
     (faIdent?`<a href="https://flightaware.com/live/flight/${faIdent}" target="_blank" rel="noopener">FlightAware</a>`:'')+
@@ -722,6 +723,9 @@ async function openFlightDetail(ds){
       const grid=box.querySelector('.fl-grid');
       const extra=[];
       if(d.registration)extra.push(['Tail #',d.registration]);
+      // FR24 resolves a tail number reliably; upgrade the link now that we know it
+      if(d.registration){const a=$("#flLinks")&&$("#flLinks").querySelector('a');
+        if(a)a.href=`https://fr24.com/${encodeURIComponent(d.registration)}`;}
       const gate=isArr?(d.arr_gate||d.arr_terminal):(d.dep_gate||d.dep_terminal);
       if(gate)extra.push([isArr?'Arr gate':'Dep gate',gate]);
       extra.forEach(([k,v])=>{const c=document.createElement('div');c.className='fl-cell';
