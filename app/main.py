@@ -651,31 +651,40 @@ def flight_detail(ident: str):
             # the type (e.g. a WOW Air jet for an American flight) — misleading.
             # So when there's no reg, show a labeled type illustration instead.
             reg = d.get("registration")
+            # AeroDataBox's OWN photo (from adb_mod.flight_detail) — a real photo of
+            # the actual airframe when a tail is known, and it's reachable from this
+            # server. Keep it as a fallback before the illustration.
+            adb_img = d.get("image_url")
+            adb_credit = d.get("image_credit")
+            adb_link = d.get("image_link")
             if not reg:
+                # No tail: AeroDataBox's image can be any operator's example of the
+                # type (a WOW Air jet for an American flight) — misleading. Use the
+                # labeled illustration instead.
                 d["image_url"] = f"/static/types/{slug}.png" if slug else None
                 d["image_credit"] = None
                 d["image_link"] = None
                 d["image_is_art"] = bool(slug)
             else:
-                # Prefer Planespotters (better source: real spotter photo of the
-                # actual airframe, with photographer credit + link). Fall back to
-                # AeroDataBox's own photo, then to the labeled type illustration.
+                # Real photo of THIS airframe. 1st choice Planespotters (latest by
+                # date taken, if reachable); else AeroDataBox's own photo (real
+                # airframe, works from this server); else the labeled illustration.
                 pic = None
                 try:
                     pic = photos.get_photo(d.get("icao24") or "", reg)
                 except Exception:  # noqa: BLE001
                     pic = None
                 if pic and (pic.get("thumbnail_large") or pic.get("thumbnail")):
-                    # Planespotters serves the LATEST photo by date taken, so this
-                    # is always the newest photo that exists of this airframe.
                     d["image_url"] = pic.get("thumbnail_large") or pic.get("thumbnail")
                     d["image_credit"] = pic.get("photographer") or pic.get("credit")
                     d["image_link"] = pic.get("link")
                     d["image_is_art"] = False
+                elif adb_img:
+                    d["image_url"] = adb_img
+                    d["image_credit"] = adb_credit
+                    d["image_link"] = adb_link
+                    d["image_is_art"] = False
                 else:
-                    # No fresh Planespotters photo. AeroDataBox's image carries no
-                    # date and could be years old, so we DON'T show it — a clean,
-                    # labeled illustration beats a stale photo.
                     d["image_url"] = f"/static/types/{slug}.png" if slug else None
                     d["image_credit"] = None
                     d["image_link"] = None

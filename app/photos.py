@@ -32,8 +32,13 @@ LAST_DIAG = {}
 # ---------------------------------------------------------------- providers
 def _planespotters(client, icao24, registration):
     def fetch(url):
-        r = client.get(url)
+        LAST_DIAG.clear()
         LAST_DIAG["url"] = url
+        try:
+            r = client.get(url)
+        except Exception as e:  # noqa: BLE001 — capture connection/proxy errors too
+            LAST_DIAG["exception"] = f"{type(e).__name__}: {str(e)[:160]}"
+            return None
         LAST_DIAG["status"] = r.status_code
         LAST_DIAG["body"] = (r.text or "")[:200]
         if r.status_code != 200:
