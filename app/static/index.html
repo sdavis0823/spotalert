@@ -486,9 +486,11 @@ function evRow(e){
   const code=(e.origin||e.destination||e.route_code||'').toString().toUpperCase();
   const codeHtml=code?`<div class="jt-code">${code}</div>`:`<div class="jt-code none">—</div>`;
   const faIdent=encodeURIComponent(flight||reg||'');
-  // FR24: link the aircraft page by tail when known, else the flight page by number
-  const fr=reg?`https://www.flightradar24.com/data/aircraft/${encodeURIComponent(reg.toLowerCase())}`
-    :(flight?`https://www.flightradar24.com/data/flights/${encodeURIComponent(flight.toLowerCase())}`:'');
+  // FR24 short-URL form (fr24.com/<flight|tail>) — this opens the FR24 APP on
+  // iOS/Android when installed (the long /data/ URLs open the browser instead).
+  // Prefer the flight number (callsign) since it triggers the app most reliably.
+  const frKey=flight||reg||'';
+  const fr=frKey?`https://fr24.com/${encodeURIComponent(frKey)}`:'';
   const links=`<div class="jt-links">`+
     (faIdent?`<a href="https://flightaware.com/live/flight/${faIdent}" target="_blank" rel="noopener">FlightAware</a>`:'')+
     (fr?`<a href="${fr}" target="_blank" rel="noopener">FR24</a>`:'')+
@@ -684,7 +686,7 @@ async function openFlightDetail(ds){
   const idl=(ds.ident||'').toLowerCase();
   const links=$("#flLinks");
   if(links)links.innerHTML=
-    (ds.ident?`<a href="https://www.flightradar24.com/data/flights/${encodeURIComponent(idl)}" target="_blank" rel="noopener">Track on FR24</a>`:'')+
+    (ds.ident?`<a href="https://fr24.com/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">Track on FR24</a>`:'')+
     (ds.ident?`<a class="alt" href="https://flightaware.com/live/flight/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">FlightAware</a>`:'');
   if(!ds.ident)return;
   try{
