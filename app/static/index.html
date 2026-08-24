@@ -279,6 +279,10 @@
   .wx .cat{font-weight:700;border-radius:6px;padding:2px 7px;font-size:11px}
   .wx .cat.VFR{background:#eafaf2;color:#0e9f66} .wx .cat.MVFR{background:#eef4ff;color:#2f6fe0}
   .wx .cat.IFR{background:#fdeef0;color:#c81e2a} .wx .cat.LIFR{background:#f3e2f7;color:#8e24aa}
+  .wx .dly{font-weight:700;border-radius:6px;padding:2px 7px;font-size:11px;cursor:help}
+  .wx .dly.ontime{background:#eafaf2;color:#0e9f66}
+  .wx .dly.minor{background:#fff6e5;color:#b26a00}
+  .wx .dly.major{background:#fdeef0;color:#c81e2a}
 
   /* ============ JetTip-style board ============ */
   .jt-airport{display:flex;align-items:center;gap:14px;background:#c9d3dd;
@@ -610,6 +614,8 @@ async function loadBoard(){
     <div class="jt-foot">Via FAA · SpotAlert unfiltered feeds</div>
    </div>`;
   loadWx(); loadFaBudget();
+  // keep weather + delay status current on their own (METAR ~hourly, FAA ~min)
+  if(!window.WX_TIMER){window.WX_TIMER=setInterval(loadWx,300000);}
 }
 async function tagLivery(icao24, reg, tail){
   const name=prompt(`Tag "${tail||reg||icao24}" as a special livery.\nOptional: name the livery (e.g. "arizona-one", "retro"):`, "special-livery");
@@ -710,9 +716,13 @@ async function loadWx(){
     el.style.display='flex';
     const rwy=w.active_runway?`<span class="rwy">${w.runway_flow?w.runway_flow[0].toUpperCase()+w.runway_flow.slice(1)+'-bound · ':''}Rwy ${w.active_runway}</span>`:'';
     const cat=w.flight_category?`<span class="cat ${w.flight_category}">${w.flight_category}</span>`:'';
+    let dly='';
+    if(w.delay&&w.delay.ok){const lv=w.delay.level||'ontime';
+      const t=w.delay.detail?`${w.delay.label} — ${w.delay.detail}`:w.delay.label;
+      dly=`<span class="dly ${lv}" title="${t.replace(/"/g,'&quot;')}">${w.delay.label}</span>`;}
     const mph=k=>Math.round((k||0)*1.15078);
     const f=c=>Math.round(c*9/5+32);
-    el.innerHTML=`${cat} <b>${ap}</b> ${rwy} `+
+    el.innerHTML=`${cat} ${dly} <b>${ap}</b> ${rwy} `+
       (w.wind_dir!=null?`· wind <b>${w.wind_dir}°</b> @ ${mph(w.wind_kt)} mph`+(w.wind_gust_kt?` G${mph(w.wind_gust_kt)}`:'')+' ':'')+
       (w.temp_c!=null?`· ${f(w.temp_c)}°F `:'')+
       (w.visibility!=null?`· vis ${w.visibility} mi `:'')+
