@@ -445,10 +445,13 @@ function evRow(e){
   const code=(e.origin||e.destination||e.route_code||'').toString().toUpperCase();
   const codeHtml=code?`<div class="jt-code">${code}</div>`:`<div class="jt-code none">—</div>`;
   const faIdent=encodeURIComponent(flight||reg||'');
-  const frReg=encodeURIComponent((reg||'').toLowerCase());
+  // FR24: link the aircraft page by tail when known, else the flight page by number
+  const fr=reg?`https://www.flightradar24.com/data/aircraft/${encodeURIComponent(reg.toLowerCase())}`
+    :(flight?`https://www.flightradar24.com/data/flights/${encodeURIComponent(flight.toLowerCase())}`:'');
   const links=`<div class="jt-links">`+
     (faIdent?`<a href="https://flightaware.com/live/flight/${faIdent}" target="_blank" rel="noopener">FlightAware</a>`:'')+
-    (frReg?`<a href="https://www.flightradar24.com/data/aircraft/${frReg}" target="_blank" rel="noopener">FR24</a>`:'')+
+    (fr?`<a href="${fr}" target="_blank" rel="noopener">FR24</a>`:'')+
+    (faIdent?`<a href="https://flightaware.com/live/flight/${faIdent}" target="_blank" rel="noopener">Details</a>`:'')+
     `<span class="tagbtn2" title="Mark as special livery" onclick="event.stopPropagation();tagLivery('${e.icao24||''}','${(reg||'').replace(/'/g,'')}','${(name||'').replace(/'/g,'')}')">✦ Tag</span>`+
     `</div>`;
   return `<div class="jt-row ${jtTint(e)}">
@@ -509,8 +512,8 @@ function catVisible(e){
   if(JTF.config==='pax'&&e.category==='cargo')return false;
   if(JTF.livery==='special'&&!(e.category==='special'||(e.interest_tags||[]).some(t=>/livery|retro|heritage/i.test(t))))return false;
   if(JTF.notoriety==='divert'&&e.direction!=='diversion')return false;
-  if(JTF.notoriety==='heavy'&&!/^(A30|A31|A33|A34|A35|A38|B74|B76|B77|B78|MD11|IL7|IL9|AN1|AN2|DC10)/.test(T))return false;
-  if(JTF.notoriety==='tri'&&!/^(MD11|DC10|B72|B74|A34|A38|IL76|IL96|AN12|AN22|AN124|AN225|L101)/.test(T))return false;
+  if(JTF.notoriety==='heavy'&&!/A380|A350|A340|A330|A300|A310|747|777|767|787|A35|A34|A33|A38|B74|B76|B77|B78|MD11|MD-11|DC10|DC-10|ILYUSHIN|ANTONOV/i.test(T))return false;
+  if(JTF.notoriety==='tri'&&!/MD11|MD-11|DC10|DC-10|747|A340|L1011|L-1011|TRISTAR|ANTONOV|IL76|IL-76|IL96|IL-96|727/i.test(T))return false;
   if(JTF.notoriety==='intl'){const op=(e.operator||'').toLowerCase();if(!op||US_CARRIERS.some(u=>op.includes(u)))return false;}
   return true;
 }
@@ -530,10 +533,13 @@ function inSelectedDay(e){
   return e.event_time>=start&&e.event_time<end;
 }
 async function loadBoard(){
-  const ap=$("#airport").value,hours=$("#hours").value||72;
-  const data=await j(`/api/board/${ap}?hours=${hours}&notable_only=false`);
+  const ap=$("#airport").value;
+  // whole selected day, midnight-to-midnight (local)
+  const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+DAYSEL);
+  const from=Math.floor(d.getTime()/1000), to=from+86400;
+  const data=await j(`/api/board/${ap}?notable_only=false&day_from=${from}&day_to=${to}`);
   renderCatbar(); renderDayTabs();
-  const events=data.events.filter(e=>catVisible(e)&&inSelectedDay(e));
+  const events=data.events.filter(e=>catVisible(e));
   const red=events.filter(e=>e.priority==='red').length,blue=events.filter(e=>e.priority==='blue').length,blk=events.filter(e=>e.is_blocked).length;
   $("#stat").innerHTML=`<div><b>${events.length}</b><span>events shown</span></div>
     <div><b style="color:var(--red)">${red}</b><span>high priority</span></div>
