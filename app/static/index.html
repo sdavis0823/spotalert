@@ -300,7 +300,8 @@
     <label class="muted">Show</label>
     <select id="filter"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
     <button class="primary" id="refresh">↻ Run cycle now</button>
-    <button class="ghost" id="faScan" title="One FlightAware query: pre-takeoff, departures, enroute ETAs, diversions">✈ Scan FlightAware</button>
+    <button class="ghost" id="faScan" title="Quick scan: next several hours of scheduled arrivals">✈ Scan FlightAware</button>
+    <button class="ghost" id="faDeep" title="Deep scan: pages the full next day so no special livery is missed (uses more FlightAware queries)">🔎 Deep scan (full day)</button>
     <span class="pill fa" id="faBudget" title="FlightAware free-tier queries left this month" style="display:none"></span>
   </div>
   <div class="wx" id="wx" style="display:none"></div>
@@ -1020,6 +1021,17 @@ async function init(){
     fs.textContent="✈ Scan FlightAware";fs.disabled=false;
     if(!r.ok){alert(r.note||"FlightAware scan unavailable.");}
     else{alert(`FlightAware scan done.\nNew alerts: ${r.new_alerts}\nQueries left this month: ${r.budget_remaining}`);}
+    loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
+  };
+  const fd=$("#faDeep");
+  if(fd)fd.onclick=async()=>{
+    const ap=$("#airport").value;
+    if(!confirm(`Deep scan ${ap} for the full next day?\n\nThis pages the whole day's schedule so no special livery is missed. It uses more FlightAware queries than a quick scan — your hard monthly cap still protects you from any charge.`)) return;
+    fd.textContent="Deep scanning…";fd.disabled=true;
+    const r=await j(`/api/flightaware/scan?airport=${ap}&deep=true`,{method:"POST"});
+    fd.textContent="🔎 Deep scan (full day)";fd.disabled=false;
+    if(!r.ok){alert(r.note||"Deep scan unavailable.");}
+    else{alert(`Deep scan done (${r.pages} pages).\nNew special/notable alerts: ${r.new_alerts}\nQueries left this month: ${r.budget_remaining}`);}
     loadFaBudget(); if(TAB==="board")loadBoard().then(loadPhotos);
   };
   loadScheduler();setInterval(loadScheduler,15000);
