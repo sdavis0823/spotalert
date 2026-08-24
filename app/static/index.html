@@ -306,8 +306,8 @@
   <div class="controls" id="boardControls">
     <label class="muted">Airport</label><select id="airport"></select>
     <button class="ghost" id="apAdd" title="Search every airport worldwide">＋ Add airport</button>
-    <label class="muted">Window</label>
-    <select id="hours"><option value="24" selected>24h</option><option value="48">48h</option><option value="168">7d</option><option value="720">30d</option></select>
+    <span id="daytabs" class="daytabs"></span>
+    <select id="hours" style="display:none"><option value="72" selected>72h</option></select>
     <select id="filter" style="display:none"><option value="all">All traffic</option><option value="notable" selected>Notable only</option></select>
     <button class="primary" id="refresh" style="display:none">↻ Run cycle now</button>
     <button class="ghost" id="faScan" style="display:none" title="Quick scan">✈ Scan FlightAware</button>
@@ -459,7 +459,6 @@ function evRow(e){
 const JTF={interest:'notable',timing:'future',direction:'both',hub:'show',config:'any',livery:'any',notoriety:'any'};
 const JTFGROUPS=[
   {k:'interest', label:'Interest',     opts:[['any','Any'],['notable','Notable'],['high','High'],['low','Low']]},
-  {k:'timing',   label:'Timing',       opts:[['both','Both'],['past','Past'],['future','Future']]},
   {k:'direction',label:'Direction',    opts:[['both','Both'],['arrival','Arrivals'],['departure','Departures']]},
   {k:'hub',      label:'Hub airlines', opts:[['show','Show'],['hide','Hide']]},
   {k:'config',   label:'Configuration',opts:[['any','Any'],['pax','Pax'],['cargo','Cargo']]},
@@ -490,8 +489,6 @@ function catVisible(e){
   if(JTF.interest==='notable'&&!isNotableEv(e))return false;
   if(JTF.interest==='high'&&!(e.priority==='red'||e.notable||['special','military','gov'].includes(e.category)))return false;
   if(JTF.interest==='low'&&e.priority!=='blue')return false;
-  if(JTF.timing==='future'&&e.event_time<=now-1800)return false;
-  if(JTF.timing==='past'&&e.event_time>now)return false;
   const dep=['departure','departing'].includes(e.direction);
   if(JTF.direction==='arrival'&&dep)return false;
   if(JTF.direction==='departure'&&!dep)return false;
@@ -506,11 +503,26 @@ function catVisible(e){
   if(JTF.notoriety==='intl'){const op=(e.operator||'').toLowerCase();if(!op||US_CARRIERS.some(u=>op.includes(u)))return false;}
   return true;
 }
+// ---- day tabs (Today / Tomorrow / day-after) ----
+let DAYSEL=0;
+function dayLabel(off){const d=new Date();d.setDate(d.getDate()+off);
+  if(off===0)return'Today';if(off===1)return'Tomorrow';
+  return d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});}
+function renderDayTabs(){
+  const box=$("#daytabs"); if(!box)return;
+  box.innerHTML='<span class="jtf-seg">'+[0,1,2].map(o=>`<button data-o="${o}" class="${DAYSEL===o?'on':''}">${dayLabel(o)}</button>`).join('')+'</span>';
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>{DAYSEL=+b.dataset.o;renderDayTabs();if(TAB==='board')loadBoard().then(loadPhotos);});
+}
+function inSelectedDay(e){
+  const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+DAYSEL);
+  const start=d.getTime()/1000, end=start+86400;
+  return e.event_time>=start&&e.event_time<end;
+}
 async function loadBoard(){
-  const ap=$("#airport").value,hours=$("#hours").value;
+  const ap=$("#airport").value,hours=$("#hours").value||72;
   const data=await j(`/api/board/${ap}?hours=${hours}&notable_only=false`);
-  renderCatbar();
-  const events=data.events.filter(catVisible);
+  renderCatbar(); renderDayTabs();
+  const events=data.events.filter(e=>catVisible(e)&&inSelectedDay(e));
   const red=events.filter(e=>e.priority==='red').length,blue=events.filter(e=>e.priority==='blue').length,blk=events.filter(e=>e.is_blocked).length;
   $("#stat").innerHTML=`<div><b>${events.length}</b><span>events shown</span></div>
     <div><b style="color:var(--red)">${red}</b><span>high priority</span></div>
@@ -522,7 +534,7 @@ async function loadBoard(){
   const mparts=label.split(/[—-]/);
   const apCode=(mparts[0]||ap).trim().replace(/^K([A-Z]{3})$/,'$1');
   const apName=(mparts.slice(1).join('-')||label).trim();
-  const rows=events.length?events.map(evRow).join(""):'<div class="empty" style="border-radius:0;border:none">No matching traffic. Try “All traffic”, adjust the filters above, or “Run cycle now”.</div>';
+  const rows=events.length?events.map(evRow).join(""):`<div class="empty" style="border-radius:0;border:none">Nothing scheduled for ${dayLabel(DAYSEL)} yet — tap “Load full day”, or ease the filters above.</div>`;
   $("#board").innerHTML=`
    <div class="jt-wrap">
     <div class="jt-airport">
@@ -530,7 +542,7 @@ async function loadBoard(){
       <div class="jt-ap-name">${apName}<span>Arrivals &amp; departures · unfiltered</span></div>
       <div class="jt-bell">🔕</div>
     </div>
-    <div class="jt-today">Today</div>
+    <div class="jt-today">${dayLabel(DAYSEL).toUpperCase()}</div>
     <div class="jt-list">${rows}</div>
     <div class="jt-foot">Via FAA · SpotAlert unfiltered feeds</div>
    </div>`;
