@@ -527,10 +527,17 @@ const HUBS={KPHX:['american','southwest'],KLAX:['american','united','delta','sou
             KIWA:['allegiant'],KDFW:['american'],KATL:['delta'],KDEN:['united','southwest','frontier']};
 const US_CARRIERS=['american','southwest','delta','united','alaska','jetblue','spirit','frontier',
   'hawaiian','sun country','allegiant','fedex','ups','skywest','envoy','republic','endeavor','horizon'];
+const HEAVY_RE=/A380|A350|A340|A330|A300|A310|747|777|767|787|A35|A34|A33|A38|B74|B76|B77|B78|MD11|MD-11|DC10|DC-10|ILYUSHIN|ANTONOV/i;
+const BIZ_RE=/GULFSTREAM|CITATION|LEARJET|CHALLENGER|GLOBAL|FALCON|PHENOM|LEGACY|PRAETOR|HAWKER|PILATUS|KING ?AIR|HONDAJET|VISION JET|GLEX|GLF|G[0-9]{3}\b|BEECHJET|NEXTANT/i;
+function evIsHeavy(e){return HEAVY_RE.test((e.type||'').toUpperCase());}
+function evIsBiz(e){const T=(e.type||'').toUpperCase();return BIZ_RE.test(T)||e.category==='private'||(e.interest_tags||[]).includes('large-private');}
+function evIsSpecial(e){return e.category==='special'||(e.interest_tags||[]).some(t=>/livery|retro|heritage/i.test(t));}
+function evIsIntl(e){const op=(e.operator||'').toLowerCase();return !!op&&!US_CARRIERS.some(u=>op.includes(u));}
+// standout: the aircraft a spotter chases. common-notable: also worth a look.
+function evHigh(e){return evIsSpecial(e)||evIsHeavy(e)||evIsBiz(e)||['military','gov','warbird','tanker'].includes(e.category)||e.direction==='diversion';}
+function evNotable(e){return evHigh(e)||evIsIntl(e)||e.category==='cargo';}
 function isNotableEv(e){
-  return !!(e.priority||e.is_blocked||e.notable||
-    (e.category&&['special','military','gov','warbird','tanker','testbed','charter','cargo','private'].includes(e.category))||
-    (e.interest_tags||[]).length);
+  return evNotable(e)||!!(e.priority||e.is_blocked||e.notable)||(e.interest_tags||[]).length>0;
 }
 function renderCatbar(){                         // renders the JetTip filter panel
   const bar=$("#catbar"); if(!bar) return;
@@ -546,9 +553,9 @@ let AIRLINEF="";
 function catVisible(e){
   const now=Date.now()/1000, T=(e.type||'').toUpperCase();
   if(AIRLINEF&&(e.operator||'')!==AIRLINEF)return false;
-  if(JTF.interest==='notable'&&!isNotableEv(e))return false;
-  if(JTF.interest==='high'&&!(e.priority==='red'||e.notable||['special','military','gov'].includes(e.category)))return false;
-  if(JTF.interest==='low'&&e.priority!=='blue')return false;
+  if(JTF.interest==='high'&&!evHigh(e))return false;
+  if(JTF.interest==='notable'&&!evNotable(e))return false;
+  if(JTF.interest==='low'&&evNotable(e))return false;
   const dep=['departure','departing'].includes(e.direction);
   if(JTF.direction==='arrival'&&dep)return false;
   if(JTF.direction==='departure'&&!dep)return false;
