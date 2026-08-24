@@ -666,13 +666,20 @@ def flight_detail(ident: str):
                 except Exception:  # noqa: BLE001
                     pic = None
                 if pic and (pic.get("thumbnail_large") or pic.get("thumbnail")):
+                    # Planespotters serves the LATEST photo by date taken, so this
+                    # is always the newest photo that exists of this airframe.
                     d["image_url"] = pic.get("thumbnail_large") or pic.get("thumbnail")
                     d["image_credit"] = pic.get("photographer") or pic.get("credit")
                     d["image_link"] = pic.get("link")
                     d["image_is_art"] = False
-                elif not d.get("image_url") and slug:
-                    d["image_url"] = f"/types/{slug}.png"
-                    d["image_is_art"] = True
+                else:
+                    # No fresh Planespotters photo. AeroDataBox's image carries no
+                    # date and could be years old, so we DON'T show it — a clean,
+                    # labeled illustration beats a stale photo.
+                    d["image_url"] = f"/types/{slug}.png" if slug else None
+                    d["image_credit"] = None
+                    d["image_link"] = None
+                    d["image_is_art"] = bool(slug)
             return {"ok": True, **d}
     return {"ok": False, "note": "No live detail available for this flight yet."}
 
