@@ -513,7 +513,7 @@ def upcoming(icao: str):
 
 
 @app.post("/api/flightaware/scan")
-def flightaware_scan(airport: str | None = None):
+def flightaware_scan(airport: str | None = None, deep: bool = False):
     """Manual 'Scan now' — combined FlightAware scan (pre-takeoff, departures,
     enroute ETAs, diversions, cancellations). One AeroAPI query per airport.
     Pass ?airport=ICAO to scan just one and spend a single query."""
@@ -528,15 +528,17 @@ def flightaware_scan(airport: str | None = None):
     else:
         with db.get_conn() as conn:
             airports = [r["icao"] for r in conn.execute("SELECT icao FROM airports").fetchall()]
+    pages = config.FA_DEEP_PAGES if deep else config.FA_SCHED_PAGES
     total = 0
     scanned = 0
     for ap in airports:
         if not src.budget_ok():
             break
-        total += fa_mod.scan_airport_flights(ap)["new_alerts"]
+        total += fa_mod.scan_airport_flights(ap, pages=pages)["new_alerts"]
         scanned += 1
     notify.dispatch_new()
     return {"ok": True, "new_alerts": total, "airports_scanned": scanned,
+            "deep": deep, "pages": pages,
             "budget_remaining": fa_mod.budget_remaining()}
 
 

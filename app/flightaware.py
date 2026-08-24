@@ -420,9 +420,13 @@ def _emit_alert(conn, airport_icao, icao24, direction, ident, event_time,
     return True
 
 
-def scan_airport_flights(airport_icao: str) -> dict:
+def scan_airport_flights(airport_icao: str, pages: int | None = None) -> dict:
     """Thrifty combined scan: ONE AeroAPI call -> pre-takeoff, departures,
-    enroute ETAs, diversions and cancellations, for notable airframes only."""
+    enroute ETAs, diversions and cancellations, for notable airframes only.
+
+    `pages` overrides how deep to page scheduled arrivals (default
+    config.FA_SCHED_PAGES). A larger value (deep scan) reaches further into
+    tomorrow so no scheduled special livery is missed."""
     from . import db
     src = FlightAwareSource()
     if not src.available():
@@ -437,7 +441,7 @@ def scan_airport_flights(airport_icao: str) -> dict:
     # catch notable frames hours ahead, not just the immediate ~15 flights.
     start = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
     end = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(horizon))
-    wide = src.scheduled_arrivals(airport_icao, max_pages=config.FA_SCHED_PAGES,
+    wide = src.scheduled_arrivals(airport_icao, max_pages=pages or config.FA_SCHED_PAGES,
                                   start=start, end=end)
     seen_idents = set()
     arrivals_all = []
