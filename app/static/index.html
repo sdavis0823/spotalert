@@ -387,7 +387,6 @@
   <div class="tabs">
     <button data-tab="board" class="active">Planes</button>
     <button data-tab="upcoming">Upcoming</button>
-    <button data-tab="radar">Radar</button>
     <button data-tab="inbound">Inbound ✦</button>
     <button data-tab="alerts">Alert feed</button>
     <button data-tab="notif">Notifications</button>
@@ -397,7 +396,6 @@
     <button data-tab="settings">Settings</button>
   </div>
 
-  <div id="radar" style="display:none"></div>
   <div id="upcoming" style="display:none"></div>
   <div id="board" class="grid"></div>
   <div id="inbound" style="display:none"></div>
@@ -1187,12 +1185,11 @@ async function loadUpcoming(){
       <div class="eta">${lh}h${String(lm).padStart(2,'0')}</div></div>`;}).join("");
   $("#upcoming").innerHTML=note+`<div class="grid">${rows||'<div class="empty">Nothing notable scheduled yet'+(d.flightaware?'':' — add a FlightAware key to enable this')+'.</div>'}</div>`;
 }
-const LOADERS={radar:loadRadar,upcoming:loadUpcoming,board:loadBoard,inbound:loadInbound,alerts:loadAlerts,notif:loadNotif,watch:loadWatch,log:loadLog,guide:loadGuide,settings:loadSettings};
+const LOADERS={upcoming:loadUpcoming,board:loadBoard,inbound:loadInbound,alerts:loadAlerts,notif:loadNotif,watch:loadWatch,log:loadLog,guide:loadGuide,settings:loadSettings};
 function switchTab(t){
-  if(TAB==="radar"&&t!=="radar")stopRadar();
   TAB=t;
   document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["radar","upcoming","board","inbound","alerts","notif","watch","log","guide","settings"].forEach(id=>{
+  ["upcoming","board","inbound","alerts","notif","watch","log","guide","settings"].forEach(id=>{
     const grid=(id==="board"||id==="alerts"||id==="notif");
     $("#"+id).style.display=(id===t)?(grid?"grid":"block"):"none";});
   $("#boardControls").style.display=(t==="board")?"flex":"none";
