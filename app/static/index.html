@@ -164,6 +164,8 @@
   .r-detail img{width:96px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--line2);background:var(--surface2)}
   .r-detail .x{position:absolute;top:6px;right:10px;color:var(--faint);cursor:pointer;font-size:16px}
   .r-detail b{font-size:14px;font-weight:700} .r-detail .m{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+  .r-detail .rd-fr{display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:#fff;background:#3d6df0;border-radius:7px;padding:5px 11px;text-decoration:none}
+  .r-detail .rd-fr:hover{background:#2f5be0}
 
   @media(max-width:640px){
     .radar-wrap{grid-template-columns:1fr} .r-side{max-height:230px;overflow:auto}
@@ -1097,8 +1099,12 @@ async function loadRadar(){
 }
 function stopRadar(){if(RADAR.raf)cancelAnimationFrame(RADAR.raf);if(RADAR.poll)clearInterval(RADAR.poll);RADAR.raf=RADAR.poll=null;}
 async function pollRadar(){
-  try{const d=await j(`/api/live/${RADAR.ap}?radius=${RADAR.radius}`);RADAR.contacts=d.contacts||[];renderRadarSide(d);}
-  catch(e){RADAR.contacts=[];}
+  try{const d=await j(`/api/live/${RADAR.ap}?radius=${RADAR.radius}`);
+    // keep the last good contacts if a poll comes back empty, so the scope
+    // never blinks to blank between live updates
+    if((d.contacts&&d.contacts.length)||!RADAR.contacts.length){RADAR.contacts=d.contacts||[];}
+    renderRadarSide(d.contacts&&d.contacts.length?d:{count:RADAR.contacts.length});
+  }catch(e){/* transient error: keep the previous contacts on screen */}
 }
 function renderRadarSide(d){
   const hot=RADAR.contacts.filter(c=>c.notable).length;
@@ -1153,9 +1159,13 @@ function radarClick(ev){
 }
 async function showRadarDetail(i){
   const c=RADAR.contacts[i];if(!c)return;const el=$("#radarDetail");
+  // These are live aircraft, so FR24 opens the airframe's current flight.
+  const fr=c.registration?`https://www.flightradar24.com/data/aircraft/${encodeURIComponent(c.registration.toLowerCase())}`
+    :(c.callsign?`https://www.flightradar24.com/data/flights/${encodeURIComponent(c.callsign.toLowerCase())}`:'');
   el.innerHTML=`<span class="x" onclick="$('#radarDetail').classList.remove('on')">×</span>
     <img id="rdImg" alt=""><div><b>${c.display}</b>${c.notable?' <span class="chip mil">notable</span>':''}
-      <div class="m">${c.type||'—'} · ${c.dist_nm}nm · brg ${Math.round(c.bearing)}° · ${c.alt&&c.alt!=='ground'?c.alt+'ft':(c.alt||'—')} · ${c.gs||'—'}kt</div></div>`;
+      <div class="m">${c.type||'—'} · ${c.dist_nm}nm · brg ${Math.round(c.bearing)}° · ${c.alt&&c.alt!=='ground'?c.alt+'ft':(c.alt||'—')} · ${c.gs||'—'}kt</div>
+      ${fr?`<a class="rd-fr" href="${fr}" target="_blank" rel="noopener">Track on FR24 →</a>`:''}</div>`;
   el.classList.add('on');
   try{const p=await j(`/api/photo/${c.icao24}`);if(p&&p.thumbnail){const im=$("#rdImg");if(im)im.src=p.thumbnail;}}catch(e){}
 }
