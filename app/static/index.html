@@ -303,7 +303,14 @@
   .jt-ap-code{font-family:var(--sans);font-weight:800;font-size:30px;color:#16234d;letter-spacing:-.02em;line-height:1}
   .jt-ap-name{font-family:var(--sans);font-weight:800;font-size:22px;color:#16234d;letter-spacing:-.02em;line-height:1.1;flex:1;min-width:0}
   .jt-ap-name span{display:block;font-size:12px;font-weight:600;color:#3a4a6b;letter-spacing:.01em;margin-top:2px;text-transform:none}
-  .jt-bell{color:#16234d;font-size:22px;flex-shrink:0}
+  .jt-bell{color:#16234d;font-size:22px;flex-shrink:0;cursor:pointer;position:relative;display:inline-flex;align-items:center}
+  .jt-bell .bell-n{font-family:var(--sans);font-size:11px;font-weight:800;color:#fff;background:var(--brand);border-radius:999px;padding:1px 6px;margin-left:4px}
+  .fl-bell{border:1px solid var(--line2);background:var(--surface2);color:var(--ink);border-radius:9px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer}
+  .fl-bell.on{background:#eafaf2;border-color:#8fe0bb;color:#0e9f66}
+  .bw{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:7px;font-size:13px}
+  .bw .bw-k{font-family:var(--mono);font-size:10px;color:var(--faint);text-transform:uppercase;margin-left:4px}
+  .bw .bw-on{color:#0e9f66;font-weight:700;font-size:11px}
+  .bw button{border:1px solid var(--line2);background:var(--surface);color:var(--dim);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer}
   .jt-today{background:#16234d;color:#fff;font-family:var(--sans);font-weight:800;font-size:16px;
     letter-spacing:.02em;padding:11px 18px;text-transform:uppercase}
   .jt-list{background:#fff;border:1px solid var(--line);border-top:none;overflow:hidden;
@@ -427,6 +434,23 @@
   <div class="fl-card" style="position:relative">
     <span class="fl-x" id="flClose">✕</span>
     <div id="flContent"></div>
+  </div>
+</div>
+
+<div id="bellModal" class="modal">
+  <div class="fl-card" style="position:relative;max-width:440px">
+    <span class="fl-x" id="bellClose">✕</span>
+    <div style="padding:20px 22px">
+      <div style="font-size:19px;font-weight:800">🔔 Alert me when online</div>
+      <div class="lede" style="margin:6px 0 14px">Get a push the moment a flight number or tail powers on its transponder — anywhere. Checked every few minutes.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="bellKind" style="flex:none;width:110px"><option value="flight">Flight #</option><option value="tail">Tail #</option></select>
+        <input type="text" id="bellVal" placeholder="e.g. JX26  or  N12345" style="flex:1">
+        <button type="button" id="bellAdd" style="flex:none">Add</button>
+      </div>
+      <div id="bellList"></div>
+      <div class="lede" style="margin-top:14px;font-size:12px">Notifications need push turned on in <b>Settings</b> (one-time). Without it, watches still track but can't reach your phone.</div>
+    </div>
   </div>
 </div>
 
@@ -647,13 +671,13 @@ async function loadBoard(){
     <div class="jt-airport">
       <div class="jt-ap-code">${apCode}</div>
       <div class="jt-ap-name">${apName}<span>Arrivals &amp; departures · unfiltered</span></div>
-      <div class="jt-bell">🔕</div>
+      <div class="jt-bell" onclick="openBellPanel()" title="Alert me when a flight/tail comes online">🔕</div>
     </div>
     <div class="jt-today">${dayLabel(DAYSEL).toUpperCase()}</div>
     <div class="jt-list">${rows}</div>
     <div class="jt-foot">Via FAA · SpotAlert unfiltered feeds</div>
    </div>`;
-  loadWx(); loadFaBudget();
+  loadWx(); loadFaBudget(); updateBellCount();
   // keep weather + delay status current on their own (METAR ~hourly, FAA ~min)
   if(!window.WX_TIMER){window.WX_TIMER=setInterval(loadWx,300000);}
 }
@@ -674,6 +698,62 @@ function rowTap(ev,el){
   openFlightDetail(el.dataset);
 }
 function closeFl(){$("#flModal").classList.remove("on");}
+// ---------------- ONLINE ALERTS ("ping me when it comes online") ----------
+let ONLINE_WATCHES=[];
+async function loadOnlineWatches(){
+  try{const d=await j(`/api/online-watches/${encodeURIComponent(EMAIL)}`);ONLINE_WATCHES=d.watches||[];}
+  catch(e){ONLINE_WATCHES=[];}
+  updateBellCount();
+}
+function findWatch(ident,reg){
+  const fl=(ident||'').toUpperCase().replace(/\s/g,'');
+  const tl=(reg||'').toUpperCase().replace(/\s/g,'');
+  return ONLINE_WATCHES.find(w=>(w.kind==='flight'&&w.value===fl)||(tl&&w.kind==='tail'&&w.value===tl));
+}
+function renderFlBell(btn,ident,reg){
+  const w=findWatch(ident,reg);
+  if(w){btn.innerHTML='🔔 Alerting when online';btn.classList.add('on');}
+  else{btn.innerHTML='🔕 Alert when online';btn.classList.remove('on');}
+}
+function setupFlBell(ident,reg,label){
+  const btn=$("#flBell");if(!btn)return;
+  renderFlBell(btn,ident,reg);
+  btn.onclick=async()=>{
+    btn.disabled=true;
+    const w=findWatch(ident,reg);
+    try{
+      if(w){await fetch(`/api/online-watches/${encodeURIComponent(EMAIL)}/${w.id}`,{method:'DELETE'});}
+      else{await fetch('/api/online-watches',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:EMAIL,kind:'flight',value:ident,label:label||ident})});}
+      await loadOnlineWatches();renderFlBell(btn,ident,reg);
+    }catch(e){}
+    btn.disabled=false;
+  };
+}
+function updateBellCount(){
+  const n=ONLINE_WATCHES.length;
+  document.querySelectorAll('.jt-bell').forEach(b=>{
+    b.innerHTML=(n>0?'🔔':'🔕')+(n>0?`<span class="bell-n">${n}</span>`:'');});
+}
+function openBellPanel(){const m=$("#bellModal");if(!m)return;renderBellPanel();m.classList.add('on');}
+function renderBellPanel(){
+  const list=$("#bellList");if(!list)return;
+  list.innerHTML=ONLINE_WATCHES.length?ONLINE_WATCHES.map(w=>`
+    <div class="bw"><span><b>${w.value}</b>${w.label&&w.label!==w.value?` · ${w.label}`:''} <span class="bw-k">${w.kind==='tail'?'tail':'flight'}</span>${w.last_online?' <span class="bw-on">● online</span>':''}</span>
+      <button type="button" onclick="removeBellWatch(${w.id})">Remove</button></div>`).join(''):
+    '<div class="empty" style="padding:14px">No alerts yet. Add a flight number (e.g. JX26) or a tail (e.g. N12345) above.</div>';
+}
+async function addBellWatch(){
+  const inp=$("#bellVal"),ks=$("#bellKind");if(!inp)return;
+  const v=inp.value.trim();if(!v)return;
+  try{await fetch('/api/online-watches',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:EMAIL,kind:ks?ks.value:'flight',value:v,label:''})});}catch(e){}
+  inp.value='';await loadOnlineWatches();renderBellPanel();
+}
+async function removeBellWatch(id){
+  try{await fetch(`/api/online-watches/${encodeURIComponent(EMAIL)}/${id}`,{method:'DELETE'});}catch(e){}
+  await loadOnlineWatches();renderBellPanel();
+}
 function setFr24Link(ident, tail, live){
   const a=$("#flLinks")&&$("#flLinks").querySelector('a'); if(!a)return;
   const id=(ident||'').toLowerCase().trim();
@@ -739,7 +819,9 @@ async function openFlightDetail(ds){
   const links=$("#flLinks");
   if(links)links.innerHTML=
     (ds.ident?`<a href="https://www.flightradar24.com/data/flights/${encodeURIComponent(ds.ident.toLowerCase())}" target="_blank" rel="noopener">Track on FR24</a>`:'')+
-    (ds.ident?`<a class="alt" href="https://flightaware.com/live/flight/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">FlightAware</a>`:'');
+    (ds.ident?`<a class="alt" href="https://flightaware.com/live/flight/${encodeURIComponent(ds.ident)}" target="_blank" rel="noopener">FlightAware</a>`:'')+
+    (ds.ident?`<button class="fl-bell" id="flBell" type="button">🔕 Alert when online</button>`:'');
+  if(ds.ident)setupFlBell(ds.ident, ds.reg, ds.name||ds.op||ds.ident);
   // Photo loads from the tail number the board already gave us — independent of
   // the (flaky, rate-limited) AeroDataBox flight lookup, so it shows reliably.
   loadFlightPhoto(ds.reg, ds.type, ds.ident);
@@ -1308,6 +1390,12 @@ async function init(){
   $("#airport").innerHTML=AIRPORTS.map(a=>`<option value="${a.icao}" ${a.icao===home?'selected':''}>${a.icao} — ${a.name}</option>`).join("");
   updateApBar();
   wireApModal();
+  // online-alerts (bell) modal
+  {const bc=$("#bellClose");if(bc)bc.onclick=()=>$("#bellModal").classList.remove("on");
+   const bm=$("#bellModal");if(bm)bm.onclick=e=>{if(e.target.id==="bellModal")bm.classList.remove("on");};
+   const ba=$("#bellAdd");if(ba)ba.onclick=addBellWatch;
+   const bv=$("#bellVal");if(bv)bv.onkeydown=e=>{if(e.key==="Enter")addBellWatch();};}
+  loadOnlineWatches();
   document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   ["airport","hours","filter"].forEach(id=>$("#"+id).onchange=()=>{updateApBar();if(TAB==="board")loadBoard().then(loadPhotos);});
   $("#refresh").onclick=async()=>{
