@@ -151,6 +151,22 @@ CREATE TABLE IF NOT EXISTS scheduled_flights (
     UNIQUE(airport_icao, direction, ident, event_time)
 );
 CREATE INDEX IF NOT EXISTS idx_sched_ap ON scheduled_flights(airport_icao, event_time);
+
+-- "Ping me when it comes online": watch a specific flight number or tail and
+-- get notified the moment it starts broadcasting on ADS-B (anywhere).
+CREATE TABLE IF NOT EXISTS online_watches (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    email       TEXT NOT NULL,
+    kind        TEXT NOT NULL,          -- 'flight' | 'tail'
+    value       TEXT NOT NULL,          -- e.g. 'JX26' or 'N12345'
+    label       TEXT DEFAULT '',
+    last_online INTEGER DEFAULT 0,      -- was it broadcasting at the last check?
+    last_seen   INTEGER,
+    active      INTEGER DEFAULT 1,
+    created_at  INTEGER NOT NULL,
+    UNIQUE(email, kind, value)
+);
+CREATE INDEX IF NOT EXISTS idx_ow_email ON online_watches(email);
 """
 
 

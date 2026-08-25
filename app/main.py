@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
 
 from . import db, config, aircraft as ac_mod, engine
-from . import sources, notify, scheduler, eta as eta_mod, watchlist, logbook, photos, push, liveries
+from . import sources, notify, scheduler, eta as eta_mod, watchlist, logbook, photos, push, liveries, online_watch
 from . import flightaware as fa_mod
 from . import aerodatabox as adb_mod
 from . import airports_catalog as catalog
@@ -1061,6 +1061,34 @@ def add_watchlist(w: WatchIn):
 @app.delete("/api/watchlists/{email}/{wid}")
 def del_watchlist(email: str, wid: int):
     watchlist.delete(email, wid)
+    return {"ok": True}
+
+
+# ------------------------------------------------ online watches ("come online")
+class OnlineWatchIn(BaseModel):
+    email: EmailStr
+    kind: str               # 'flight' | 'tail'
+    value: str
+    label: str = ""
+
+
+@app.get("/api/online-watches/{email}")
+def get_online_watches(email: str):
+    return {"watches": online_watch.list_for(email)}
+
+
+@app.post("/api/online-watches")
+def add_online_watch(w: OnlineWatchIn):
+    if w.kind not in ("flight", "tail"):
+        raise HTTPException(400, "kind must be flight or tail")
+    if not (w.value or "").strip():
+        raise HTTPException(400, "value required")
+    return {"ok": True, "watch": online_watch.add(w.email, w.kind, w.value, w.label)}
+
+
+@app.delete("/api/online-watches/{email}/{wid}")
+def del_online_watch(email: str, wid: int):
+    online_watch.delete(email, wid)
     return {"ok": True}
 
 

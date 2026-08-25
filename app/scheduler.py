@@ -138,6 +138,19 @@ def _refresh_all(hours: int) -> dict:
         except Exception as e:  # noqa: BLE001
             totals["registry_refresh"] = {"ok": False, "error": str(e)[:120]}
 
+    # "ping me when it comes online" — poll each watched flight/tail and push a
+    # notification the moment one starts broadcasting on ADS-B.
+    try:
+        from . import online_watch, push
+        fired = online_watch.check_all()
+        for f in fired:
+            name = f.get("label") or f["value"]
+            push.send(f["email"], f"{name} is online now",
+                      f"{f['value']} is broadcasting — {f.get('blurb') or 'airborne'}", "/")
+        totals["online_watch_fired"] = len(fired)
+    except Exception as e:  # noqa: BLE001
+        totals["online_watch_fired"] = {"error": str(e)[:120]}
+
     totals["dispatch"] = notify.dispatch_new()
     return totals
 
